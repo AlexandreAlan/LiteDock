@@ -1,0 +1,28 @@
+# Infra de desenvolvimento do LiteDock - Postgres + Redis ISOLADOS.
+# Portas so no loopback e fora das faixas de producao (5432/5433/5434, 6379/6380).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: litedock-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litedock
+      POSTGRES_PASSWORD: litedock
+      POSTGRES_DB: litedock
+    ports:
+      - "127.0.0.1:5440:5432"
+    volumes:
+      - litedock_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: litedock-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6390:6379"
+    volumes:
+      - litedock_redisdata:/data
+
+volumes:
+  litedock_pgdata:
+  litedock_redisdata:

@@ -1,0 +1,121 @@
+// Modelo de dados do LiteDock (control plane).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  role         String       @default("owner") // owner | admin | member
+  createdAt    DateTime     @default(now())
+  projects     Project[]
+  credentials  Credential[]
+}
+
+// Servidor alvo. MVP = 1 local; preparado pra multi-node (agentes).
+model Server {
+  id             String    @id @default(uuid())
+  name           String
+  dockerEndpoint String    @default("unix:///var/run/docker.sock")
+  publicIp       String?
+  agentToken     String?
+  status         String    @default("online")
+  createdAt      DateTime  @default(now())
+  services       Service[]
+}
+
+// Workspace que agrupa serviços.
+model Project {
+  id        String    @id @default(uuid())
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  createdAt DateTime  @default(now())
+  services  Service[]
+
+  @@unique([ownerId, slug])
+}
+
+// Serviço = Aplicação OU Banco de dados. Config específica no JSON `spec`.
+model Service {
+  id          String       @id @default(uuid())
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  serverId    String
+  server      Server       @relation(fields: [serverId], references: [id])
+  name        String
+  type        String // 'app' | 'database'
+  status      String       @default("created") // created|deploying|running|stopped|error
+  containerId String?
+  spec        Json         @default("{}")
+  createdAt   DateTime     @default(now())
+  envVars     EnvVar[]
+  domains     Domain[]
+  deployments Deployment[]
+  backups     Backup[]
+
+  @@unique([projectId, name])
+}
+
+model EnvVar {
+  id        String  @id @default(uuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  key       String
+  value     String // cifrado (AES-GCM) em repouso
+  isSecret  Boolean @default(true)
+
+  @@unique([serviceId, key])
+}
+
+model Domain {
+  id         String   @id @default(uuid())
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  host       String   @unique
+  targetPort Int
+  https      Boolean  @default(true)
+  certStatus String   @default("pending") // pending|active|error
+  createdAt  DateTime @default(now())
+}
+
+model Deployment {
+  id         String    @id @default(uuid())
+  serviceId  String
+  service    Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  status     String    @default("queued") // queued|building|deploying|success|failed
+  trigger    String    @default("manual") // manual|webhook|api
+  commitSha  String?
+  imageTag   String?
+  log        String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+model Credential {
+  id        String   @id @default(uuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind      String // github | gitlab | registry
+  name      String
+  token     String // cifrado
+  createdAt DateTime @default(now())
+}
+
+model Backup {
+  id        String   @id @default(uuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  status    String   @default("pending")
+  location  String?
+  sizeBytes BigInt?
+  createdAt DateTime @default(now())
+}

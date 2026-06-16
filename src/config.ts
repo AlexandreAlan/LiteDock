@@ -1,0 +1,23 @@
+// Carrega .env (nativo do Node) e expoe config tipada.
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const envPath = join(root, '.env');
+if (existsSync(envPath)) {
+  try {
+    process.loadEnvFile(envPath);
+  } catch (e) {
+    console.warn('[config] nao consegui carregar .env:', (e as Error).message);
+  }
+}
+
+export const config = {
+  root,
+  port: Number(process.env.PORT || 8088),
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+  dockerSocket: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
+  databaseUrl: process.env.DATABASE_URL || '',
+  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6390',
+};
