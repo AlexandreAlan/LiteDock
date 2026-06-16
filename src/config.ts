@@ -20,4 +20,6 @@ export const config = {
   dockerSocket: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
   databaseUrl: process.env.DATABASE_URL || '',
   redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6390',
+  encryptionKey: process.env.ENCRYPTION_KEY || 'dev-encryption-key-change-me-32bytes',
+  traefikNetwork: process.env.TRAEFIK_NETWORK || 'litedock',
 };

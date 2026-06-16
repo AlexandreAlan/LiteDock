@@ -65,10 +65,35 @@ npm run dev        # http://127.0.0.1:8088
 | GET | `/servers/local/engine` | versão da Docker Engine |
 | GET | `/servers/local/containers` | containers do host |
 
+### Endpoints (Fase 1 — deploy real + observabilidade)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/services/:id` | detalhe (segredos mascarados) |
+| POST | `/services/:id/env` | upsert de env var (cifrada AES-256-GCM) |
+| DELETE | `/services/:id/env/:key` | remove env var |
+| POST | `/services/:id/domains` | adiciona domínio (roteamento Traefik) |
+| DELETE | `/services/:id/domains/:domainId` | remove domínio |
+| POST | `/services/:id/deploy` | **deploy real** (pull imagem → container → Traefik) |
+| POST | `/services/:id/start\|stop\|restart` | ciclo de vida |
+| DELETE | `/services/:id` | remove serviço (container + registro) |
+| GET | `/services/:id/logs?tail=N` | logs do container |
+| GET | `/services/:id/stats` | métricas CPU/memória |
+
+### Subindo o Traefik (data plane)
+
+```bash
+docker compose -f docker-compose.traefik.yml up -d
+# web:  127.0.0.1:8090  ·  websecure: 127.0.0.1:8453  ·  dashboard: 127.0.0.1:8091
+```
+
+> Traefik só roteia containers com label `litedock.managed=true` (constraint),
+> em portas loopback alternativas — **não conflita com o nginx do host (80/443)**.
+
 ## Roadmap (fases do MVP)
 
 - **Fase 0** — Fundação: scaffold, auth, Postgres/Redis, camada Docker ✅
-- **Fase 1** — Projetos + deploy de imagem + domínio + SSL (Traefik)
+- **Fase 1** — Deploy de imagem + domínio (Traefik) + env cifrada + logs/métricas + ciclo de vida ✅
 - **Fase 2** — Build de código (Git + Nixpacks + webhooks CI/CD)
 - **Fase 3** — Bancos de dados 1-clique + backups
 - **Fase 4** — Observabilidade (logs, métricas, terminal web)

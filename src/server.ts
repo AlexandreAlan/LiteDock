@@ -6,6 +6,7 @@ import { config } from './config.js';
 import { prisma, ensureLocalServer } from './db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
+import serviceRoutes from './routes/services.js';
 import serverRoutes from './routes/servers.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
@@ -40,6 +41,7 @@ app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.2.0
 
 await app.register(authRoutes, { prefix: '/auth' });
 await app.register(projectRoutes, { prefix: '/projects' });
+await app.register(serviceRoutes, { prefix: '/services' });
 await app.register(serverRoutes, { prefix: '/servers' });
 
 const start = async () => {

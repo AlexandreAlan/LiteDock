@@ -1,0 +1,36 @@
+# Traefik = data plane do LiteDock (roteamento + TLS).
+# SEGURANCA:
+#  - portas SO no loopback e ALTERNATIVAS (8090/8453) -> nao conflita com o nginx (80/443)
+#  - constraint Label(litedock.managed=true) -> Traefik IGNORA toda a producao do host
+#  - so enxerga containers que pedirem explicitamente (exposedbydefault=false)
+services:
+  traefik:
+    image: traefik:v3.7
+    container_name: litedock-traefik
+    restart: unless-stopped
+    environment:
+      # Rede do Docker 29 exige API >= 1.40 (rejeita a negociacao antiga 1.24).
+      # Traefik >= 3.7 ja fala a versao moderna; mantido como rede de seguranca.
+      DOCKER_API_VERSION: "1.44"
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=litedock
+      - --providers.docker.constraints=Label(`litedock.managed`,`true`)
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --log.level=INFO
+    ports:
+      - "127.0.0.1:8090:80"     # web  (http)
+      - "127.0.0.1:8453:443"    # websecure (https)
+      - "127.0.0.1:8091:8080"   # dashboard / api
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - litedock
+
+networks:
+  litedock:
+    name: litedock
