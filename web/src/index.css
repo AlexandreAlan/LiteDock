@@ -1,0 +1,77 @@
+/* Fontes self-hosted (sem chamada externa — produto self-hosted) */
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+  }
+  /* Scrollbar discreta no clima carvão/cobre */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-line rounded;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-copper-dim;
+  }
+  ::selection {
+    background: rgba(200, 132, 60, 0.3);
+  }
+}
+
+@layer components {
+  /* Rótulo cravado: maiúsculo, espaçado, com filete gravado embaixo */
+  .stamp {
+    @apply font-display uppercase tracking-stamp text-[11px] text-muted;
+  }
+  /* Placa: superfície elevada com leve sombra interna */
+  .plate {
+    @apply bg-panel border border-line rounded-lg shadow-plate;
+  }
+  .plate-2 {
+    @apply bg-panel2 border border-line rounded-md;
+  }
+  /* Botão de ação primário em cobre */
+  .btn-copper {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-copper px-4 py-2
+      font-display font-medium text-bg transition-colors hover:bg-copper-bright
+      focus:outline-none focus-visible:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-line
+      bg-transparent px-3 py-2 text-ink/90 transition-colors hover:bg-panel2
+      focus:outline-none focus-visible:shadow-glow;
+  }
+  .field {
+    @apply w-full rounded-md bg-panel2 border border-line px-3 py-2 text-ink
+      placeholder:text-muted/60 focus:outline-none focus:border-copper-dim
+      focus-visible:shadow-glow font-mono text-sm;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

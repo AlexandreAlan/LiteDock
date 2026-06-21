@@ -1,0 +1,102 @@
+// Client HTTP fino sobre a API Fastify do LiteDock. Base sempre "/api"
+// (dev: proxy do Vite; prod: proxy do nginx). Bearer guardado no localStorage.
+
+const TOKEN_KEY = 'litedock_token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function setToken(t: string | null) {
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  if (res.status === 401) {
+    setToken(null);
+    // deixa o AuthProvider redirecionar; ainda assim sinaliza o erro
+  }
+
+  const text = await res.text();
+  const data = text ? safeJson(text) : null;
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || `Erro ${res.status}`;
+    throw new ApiError(res.status, msg);
+  }
+  return data as T;
+}
+
+function safeJson(t: string) {
+  try {
+    return JSON.parse(t);
+  } catch {
+    return t;
+  }
+}
+
+export const api = {
+  get: <T>(p: string) => request<T>('GET', p),
+  post: <T>(p: string, b?: unknown) => request<T>('POST', p, b),
+  put: <T>(p: string, b?: unknown) => request<T>('PUT', p, b),
+  del: <T>(p: string) => request<T>('DELETE', p),
+};
+
+// ── Tipos do domínio (espelham o backend v2) ──────────────────────────────
+export interface User {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+}
+export interface Project {
+  id: string;
+  name: string;
+  createdAt?: string;
+  services?: Service[];
+}
+export interface Service {
+  id: string;
+  name: string;
+  type: string; // 'app' | 'db' | ...
+  image?: string | null;
+  status?: string | null;
+  projectId?: string;
+}
+export interface EngineInfo {
+  containers?: number;
+  containersRunning?: number;
+  containersStopped?: number;
+  images?: number;
+  serverVersion?: string;
+  ncpu?: number;
+  memTotal?: number;
+  name?: string;
+  [k: string]: unknown;
+}
+export interface HostContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  managed?: boolean;
+}

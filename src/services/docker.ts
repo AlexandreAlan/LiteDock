@@ -31,8 +31,24 @@ export async function listContainers(): Promise<ContainerInfo[]> {
   });
 }
 
-// Versao do Docker Engine - usado como "ping" da conexao.
+// Telemetria do host: versao + contagem de containers/imagens + CPU/memoria.
+// Combina docker.version() (ping) com docker.info() (metricas do engine).
 export async function engineInfo() {
-  const v = await docker.version();
-  return { version: v.Version, apiVersion: v.ApiVersion, os: v.Os, arch: v.Arch };
+  const [v, info] = await Promise.all([docker.version(), docker.info()]);
+  return {
+    version: v.Version,
+    apiVersion: v.ApiVersion,
+    os: v.Os,
+    arch: v.Arch,
+    // Espelha os nomes esperados pelo painel.
+    serverVersion: info.ServerVersion,
+    name: info.Name,
+    ncpu: info.NCPU,
+    memTotal: info.MemTotal,
+    containers: info.Containers,
+    containersRunning: info.ContainersRunning,
+    containersStopped: info.ContainersStopped,
+    containersPaused: info.ContainersPaused,
+    images: info.Images,
+  };
 }

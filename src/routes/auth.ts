@@ -10,16 +10,21 @@ const credsSchema = z.object({
 });
 
 export default async function authRoutes(app: FastifyInstance) {
-  // Registro. O PRIMEIRO usuario do sistema vira 'owner'.
+  // Registro só no BOOTSTRAP: o 1º usuario vira 'owner'. Depois fecha — novas
+  // contas entram por convite, nunca por cadastro aberto exposto na internet.
   app.post('/register', async (req, reply) => {
     const { email, password, name } = credsSchema.parse(req.body);
+
+    const total = await prisma.user.count();
+    if (total > 0)
+      return reply.code(403).send({ error: 'Cadastro fechado. Peça um convite ao administrador.' });
+
     if (await prisma.user.findUnique({ where: { email } }))
       return reply.code(409).send({ error: 'email ja cadastrado' });
 
-    const total = await prisma.user.count();
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { email, passwordHash, name, role: total === 0 ? 'owner' : 'member' },
+      data: { email, passwordHash, name, role: 'owner' },
     });
     const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role });
     reply.code(201);
