@@ -70,16 +70,47 @@ export interface User {
 export interface Project {
   id: string;
   name: string;
+  slug?: string;
   createdAt?: string;
   services?: Service[];
 }
+export type ServiceType = 'app' | 'database';
 export interface Service {
   id: string;
   name: string;
-  type: string; // 'app' | 'db' | ...
-  image?: string | null;
-  status?: string | null;
+  type: ServiceType;
+  status?: string | null; // created|deploying|running|stopped|error
+  containerId?: string | null;
+  spec?: Record<string, unknown>;
   projectId?: string;
+  domains?: Domain[];
+  createdAt?: string;
+}
+export interface EnvVar {
+  key: string;
+  value: string;
+  isSecret: boolean;
+}
+export interface Domain {
+  id: string;
+  host: string;
+  targetPort?: number;
+  https?: boolean;
+  certStatus?: string;
+}
+export interface Deployment {
+  id: string;
+  status: string;
+  trigger: string;
+  imageTag?: string | null;
+  startedAt: string;
+  finishedAt?: string | null;
+}
+export interface ServiceFull extends Service {
+  project?: Project;
+  envVars?: EnvVar[];
+  domains?: Domain[];
+  deployments?: Deployment[];
 }
 export interface EngineInfo {
   containers?: number;

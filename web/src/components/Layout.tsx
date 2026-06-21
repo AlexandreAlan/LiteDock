@@ -5,10 +5,8 @@ import { useAuth } from '../lib/auth';
 import { PressurePill } from './ui';
 
 const NAV = [
-  { to: '/', label: 'Painel', end: true },
-  { to: '/apps', label: 'Apps' },
-  { to: '/catalogo', label: 'Catálogo' },
-  { to: '/vps', label: 'VPS' },
+  { to: '/', label: 'Projects', end: true },
+  { to: '/monitor', label: 'Monitor' },
 ];
 
 export function Layout() {

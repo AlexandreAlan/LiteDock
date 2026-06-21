@@ -3,11 +3,10 @@ import { useAuth } from './lib/auth';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import { Login } from './pages/Login';
-import { Painel } from './pages/Painel';
-import { Apps } from './pages/Apps';
-import { Catalogo } from './pages/Catalogo';
-import { Vps } from './pages/Vps';
-import { ServiceDetail } from './pages/ServiceDetail';
+import { Projects } from './pages/Projects';
+import { Project } from './pages/Project';
+import { Service } from './pages/Service';
+import { Vps as Monitor } from './pages/Vps';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -31,11 +30,10 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<Painel />} />
-        <Route path="/apps" element={<Apps />} />
-        <Route path="/apps/:id" element={<ServiceDetail />} />
-        <Route path="/catalogo" element={<Catalogo />} />
-        <Route path="/vps" element={<Vps />} />
+        <Route path="/" element={<Projects />} />
+        <Route path="/project/:id" element={<Project />} />
+        <Route path="/service/:id" element={<Service />} />
+        <Route path="/monitor" element={<Monitor />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
