@@ -42,7 +42,7 @@ export function ServiceDetail() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 font-mono text-xs text-muted">
-        <Link to="/apps" className="hover:text-copper-bright">
+        <Link to="/apps" className="hover:text-brand-bright">
           apps
         </Link>
         <span>/</span>
@@ -90,7 +90,7 @@ export function ServiceDetail() {
             {stats.data ? (
               <div className="space-y-4">
                 <Gauge label="cpu" value={stats.data.cpuPct ?? 0} />
-                <Gauge label="memória" value={stats.data.memPct ?? 0} tone="copper" />
+                <Gauge label="memória" value={stats.data.memPct ?? 0} tone="brand" />
               </div>
             ) : (
               <p className="font-mono text-xs text-muted">Métricas indisponíveis no modo atual.</p>
@@ -102,7 +102,7 @@ export function ServiceDetail() {
               <ul className="space-y-1.5">
                 {s.env.map((v) => (
                   <li key={v.key} className="flex items-center justify-between gap-2 font-mono text-xs">
-                    <span className="text-copper-bright">{v.key}</span>
+                    <span className="text-brand-bright">{v.key}</span>
                     <span className="truncate text-muted">••••••</span>
                   </li>
                 ))}

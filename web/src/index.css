@@ -1,9 +1,8 @@
 /* Fontes self-hosted (sem chamada externa — produto self-hosted) */
-@import '@fontsource/space-grotesk/500.css';
-@import '@fontsource/space-grotesk/600.css';
-@import '@fontsource/space-grotesk/700.css';
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
 
@@ -13,7 +12,7 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
   html,
   body,
@@ -23,49 +22,54 @@
   body {
     @apply bg-bg text-ink font-sans antialiased;
   }
-  /* Scrollbar discreta no clima carvão/cobre */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-line rounded;
+    @apply rounded bg-line;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-copper-dim;
+    @apply bg-muted/50;
   }
   ::selection {
-    background: rgba(200, 132, 60, 0.3);
+    background: rgba(37, 99, 235, 0.16);
   }
 }
 
 @layer components {
-  /* Rótulo cravado: maiúsculo, espaçado, com filete gravado embaixo */
-  .stamp {
-    @apply font-display uppercase tracking-stamp text-[11px] text-muted;
+  /* Rótulo de seção: pequeno, discreto (estilo EasyPanel) */
+  .label {
+    @apply text-xs font-medium text-muted;
   }
-  /* Placa: superfície elevada com leve sombra interna */
+  /* compat: classe antiga usada por componentes — agora limpa, sem caixa-alta */
+  .stamp {
+    @apply text-xs font-medium text-muted;
+  }
+  /* Card branco com borda sutil e sombra leve */
+  .card,
   .plate {
-    @apply bg-panel border border-line rounded-lg shadow-plate;
+    @apply rounded-xl border border-line bg-panel shadow-card;
   }
   .plate-2 {
-    @apply bg-panel2 border border-line rounded-md;
+    @apply rounded-lg border border-line bg-panel2;
   }
-  /* Botão de ação primário em cobre */
-  .btn-copper {
-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-copper px-4 py-2
-      font-display font-medium text-bg transition-colors hover:bg-copper-bright
-      focus:outline-none focus-visible:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed;
+  /* Botão primário azul */
+  .btn-brand {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2
+      font-medium text-white shadow-card transition-colors hover:bg-brand-bright
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40
+      disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-line
-      bg-transparent px-3 py-2 text-ink/90 transition-colors hover:bg-panel2
-      focus:outline-none focus-visible:shadow-glow;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line
+      bg-panel px-3 py-2 text-ink transition-colors hover:bg-panel2
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30;
   }
   .field {
-    @apply w-full rounded-md bg-panel2 border border-line px-3 py-2 text-ink
-      placeholder:text-muted/60 focus:outline-none focus:border-copper-dim
-      focus-visible:shadow-glow font-mono text-sm;
+    @apply w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink
+      placeholder:text-muted/60 focus:border-brand focus:outline-none
+      focus-visible:ring-2 focus-visible:ring-brand/30;
   }
 }
 

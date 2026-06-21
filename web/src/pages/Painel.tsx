@@ -82,7 +82,7 @@ export function Painel() {
                     <div className="flex items-center gap-2">
                       <span className="truncate font-mono text-sm text-ink">{c.name}</span>
                       {c.managed && (
-                        <span className="rounded border border-copper-dim/50 px-1.5 py-0.5 font-display text-[9px] uppercase tracking-stamp text-copper-bright">
+                        <span className="rounded border border-brand-dim/50 px-1.5 py-0.5 font-display text-[9px] font-medium text-brand-bright">
                           litedock
                         </span>
                       )}
@@ -98,7 +98,7 @@ export function Painel() {
       </div>
 
       <p className="text-center font-mono text-[11px] text-muted">
-        <Link to="/vps" className="text-copper hover:text-copper-bright">
+        <Link to="/vps" className="text-brand hover:text-brand-bright">
           ver VPS completa →
         </Link>
       </p>

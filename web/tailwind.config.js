@@ -1,41 +1,34 @@
 /** @type {import('tailwindcss').Config} */
-// Identidade "Sala de Máquinas": carvão quente, cobre, medidores e mono.
+// Identidade clara estilo EasyPanel: branco + azul, cantos arredondados, sombras sutis.
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        bg: '#16140F', // carvão quente (fundo)
-        panel: '#211D16', // superfície elevada
-        panel2: '#2B261C', // cards / inputs
-        ink: '#EDE6D6', // texto principal (off-white quente)
-        muted: '#8A7F6B', // rótulos / secundário
-        line: '#332C20', // hairline / bordas
-        copper: {
-          DEFAULT: '#C8843C', // acento (ações, ativo)
-          bright: '#E0A05A', // hover / brilho
-          dim: '#7A5226', // copper apagado (trilhos de gauge)
+        bg: '#F8FAFC', // fundo da página (slate-50)
+        panel: '#FFFFFF', // cards / sidebar
+        panel2: '#F1F5F9', // insets / hover (slate-100)
+        ink: '#0F172A', // texto principal (slate-900)
+        muted: '#64748B', // rótulos / secundário (slate-500)
+        line: '#E2E8F0', // bordas (slate-200)
+        brand: {
+          DEFAULT: '#2563EB', // azul primário (blue-600)
+          bright: '#1D4ED8', // hover (blue-700)
+          dim: '#DBEAFE', // azul bem claro (blue-100) p/ chips/ativos
+          ink: '#1E40AF', // texto azul escuro (blue-800)
         },
-        ok: '#7FA650', // latão-verde (operando)
-        warn: '#D9A441', // atenção
-        bad: '#C25A40', // falha / parado
+        ok: '#16A34A', // verde (running)
+        warn: '#D97706', // âmbar (atenção)
+        bad: '#DC2626', // vermelho (falha)
       },
       fontFamily: {
-        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
-      letterSpacing: {
-        stamp: '0.18em', // rótulos cravados
-      },
       boxShadow: {
-        plate: 'inset 0 1px 0 rgba(237,230,214,0.04), 0 1px 2px rgba(0,0,0,0.5)',
-        glow: '0 0 0 1px rgba(200,132,60,0.4), 0 0 18px -6px rgba(200,132,60,0.5)',
-      },
-      backgroundImage: {
-        // textura sutil de chapa rebitada (tamanho aplicado via bg-[length:...])
-        rivets:
-          'radial-gradient(rgba(237,230,214,0.05) 1px, transparent 1px)',
+        card: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)',
+        pop: '0 4px 12px rgba(16,24,40,0.08), 0 2px 4px rgba(16,24,40,0.04)',
       },
     },
   },

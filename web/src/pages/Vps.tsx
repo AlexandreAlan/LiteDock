@@ -86,7 +86,7 @@ export function Vps() {
                     <td className="py-2.5 pr-3">
                       <span className="font-mono text-sm text-ink">{c.name}</span>
                       {c.managed && (
-                        <span className="ml-2 rounded border border-copper-dim/50 px-1.5 py-0.5 font-display text-[9px] uppercase tracking-stamp text-copper-bright">
+                        <span className="ml-2 rounded border border-brand-dim/50 px-1.5 py-0.5 font-display text-[9px] font-medium text-brand-bright">
                           litedock
                         </span>
                       )}

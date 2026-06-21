@@ -32,7 +32,7 @@ export function Layout() {
         <div className="flex items-center gap-3 border-b border-line px-5 py-5">
           <span className="text-2xl">🐳</span>
           <div className="leading-tight">
-            <div className="font-display text-lg font-bold tracking-wide text-ink">
+            <div className="font-display text-lg font-bold text-ink">
               LITEDOCK
             </div>
             <div className="stamp">casa de máquinas</div>
@@ -47,9 +47,9 @@ export function Layout() {
               end={n.end}
               className={({ isActive }) =>
                 [
-                  'group flex items-center gap-3 rounded-md px-3 py-2 font-display text-sm uppercase tracking-stamp transition-colors',
+                  'group flex items-center gap-3 rounded-md px-3 py-2 font-display text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-panel2 text-copper-bright shadow-[inset_2px_0_0_0_#C8843C]'
+                    ? 'bg-brand/10 text-brand'
                     : 'text-muted hover:bg-panel2 hover:text-ink',
                 ].join(' ')
               }
@@ -60,9 +60,9 @@ export function Layout() {
         </nav>
 
         <div className="border-t border-line px-4 py-4">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-copper-dim/40 bg-copper/10 px-2.5 py-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-copper" />
-            <span className="stamp text-copper-bright">modo seguro</span>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-brand-dim/40 bg-brand/10 px-2.5 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+            <span className="stamp text-brand-bright">modo seguro</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="min-w-0">
@@ -97,7 +97,7 @@ export function Layout() {
           <PressurePill pct={loadPct} label="carga" />
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-bg bg-rivets bg-[length:22px_22px] px-6 py-6">
+        <main className="flex-1 overflow-y-auto bg-bg px-6 py-6">
           <Outlet />
         </main>
       </div>

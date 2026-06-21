@@ -31,12 +31,12 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-bg bg-rivets bg-[length:22px_22px] px-4">
+    <div className="flex min-h-full items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center gap-3">
           <span className="text-3xl">🐳</span>
           <div>
-            <div className="font-display text-2xl font-bold tracking-wide text-ink">
+            <div className="font-display text-2xl font-bold text-ink">
               LITEDOCK
             </div>
             <div className="stamp">casa de máquinas · acesso</div>
@@ -72,7 +72,7 @@ export function Login() {
 
           {err && <ErrorNote message={err} />}
 
-          <button type="submit" className="btn-copper w-full" disabled={busy}>
+          <button type="submit" className="btn-brand w-full" disabled={busy}>
             {busy ? 'abrindo…' : 'Entrar'}
           </button>
 

@@ -21,7 +21,7 @@ export function Apps() {
           <h1 className="font-display text-2xl font-semibold text-ink">Apps</h1>
           <p className="stamp mt-1">serviços que você opera</p>
         </div>
-        <Link to="/catalogo" className="btn-copper">
+        <Link to="/catalogo" className="btn-brand">
           + novo app
         </Link>
       </div>
@@ -35,7 +35,7 @@ export function Apps() {
           title="Você ainda não tem apps"
           hint="Escolha um modelo no catálogo para subir o primeiro."
           action={
-            <Link to="/catalogo" className="btn-copper">
+            <Link to="/catalogo" className="btn-brand">
               abrir catálogo
             </Link>
           }
@@ -51,7 +51,7 @@ export function Apps() {
                     <li key={s.id}>
                       <Link
                         to={`/apps/${s.id}`}
-                        className="plate-2 flex items-center gap-3 p-3 transition-colors hover:border-copper-dim"
+                        className="plate-2 flex items-center gap-3 p-3 transition-colors hover:border-brand-dim"
                       >
                         <StatusDot state={s.status} />
                         <div className="min-w-0 flex-1">
@@ -60,7 +60,7 @@ export function Apps() {
                             {s.image || s.type}
                           </div>
                         </div>
-                        <span className="font-display text-copper">→</span>
+                        <span className="font-display text-brand">→</span>
                       </Link>
                     </li>
                   ))}

@@ -22,25 +22,20 @@ export function ErrorNote({ message }: { message: string }) {
 export function Spinner({ label = 'Carregando…' }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 font-mono text-sm text-muted">
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-brand border-t-transparent" />
       {label}
     </div>
   );
 }
 
-// Selo de pressão do topo — medidorzinho horizontal compacto.
+// Selo de status do topo — chip limpo com bolinha de cor + percentual.
 export function PressurePill({ pct, label }: { pct: number; label: string }) {
-  const segs = 5;
-  const filled = Math.max(1, Math.round((Math.min(100, pct) / 100) * segs));
-  const tone = pct >= 85 ? 'bg-bad' : pct >= 65 ? 'bg-warn' : 'bg-ok';
+  const dot = pct >= 85 ? 'bg-bad' : pct >= 65 ? 'bg-warn' : 'bg-ok';
   return (
-    <div className="flex items-center gap-2 rounded-md border border-line bg-panel2 px-2.5 py-1.5">
-      <span className="stamp">{label}</span>
-      <span className="flex h-2 items-center gap-[2px]">
-        {Array.from({ length: segs }).map((_, i) => (
-          <span key={i} className={`h-2 w-1 rounded-[1px] ${i < filled ? tone : 'bg-copper-dim/25'}`} />
-        ))}
-      </span>
+    <div className="flex items-center gap-2 rounded-full border border-line bg-panel px-3 py-1 shadow-card">
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span className="text-xs text-muted">{label}</span>
+      <span className="font-mono text-xs tabular-nums text-ink">{Math.round(pct)}%</span>
     </div>
   );
 }
