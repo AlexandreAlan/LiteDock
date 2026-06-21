@@ -14,7 +14,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   if (loading)
     return (
       <div className="flex h-full items-center justify-center">
-        <Spinner label="abrindo a casa de máquinas…" />
+        <Spinner label="carregando…" />
       </div>
     );
   return user ? children : <Navigate to="/login" replace />;

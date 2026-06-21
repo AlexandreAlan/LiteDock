@@ -16,7 +16,7 @@ export function Card({
     <section className={`plate p-4 ${className}`}>
       {(title || right) && (
         <header className="mb-3 flex items-center justify-between border-b border-line pb-2">
-          {title && <h2 className="stamp">{title}</h2>}
+          {title && <h2 className="text-base font-semibold text-ink">{title}</h2>}
           {right}
         </header>
       )}
@@ -33,7 +33,7 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
       <div className="font-display text-3xl font-semibold leading-none text-ink tabular-nums">
         {value}
       </div>
-      {hint && <div className="mt-1 font-mono text-xs text-muted">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );
 }

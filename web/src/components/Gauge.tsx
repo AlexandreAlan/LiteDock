@@ -40,7 +40,7 @@ export function Gauge({
       {label && (
         <div className="mb-1.5 flex items-baseline justify-between">
           <span className="label">{label}</span>
-          <span className="font-mono text-sm tabular-nums text-ink">
+          <span className="text-sm tabular-nums text-ink">
             {Math.round(value)}
             <span className="text-muted">{unit}</span>
           </span>

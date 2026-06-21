@@ -39,13 +39,13 @@ export function Login() {
             <div className="font-display text-2xl font-bold text-ink">
               LITEDOCK
             </div>
-            <div className="stamp">casa de máquinas · acesso</div>
+            <div className="stamp">acesse seu painel</div>
           </div>
         </div>
 
         <form onSubmit={submit} className="plate space-y-4 p-6">
           <div>
-            <label className="stamp mb-1 block">e-mail</label>
+            <label className="stamp mb-1 block">E-mail</label>
             <input
               className="field"
               type="email"
@@ -58,7 +58,7 @@ export function Login() {
           </div>
 
           <div>
-            <label className="stamp mb-1 block">senha</label>
+            <label className="stamp mb-1 block">Senha</label>
             <input
               className="field"
               type="password"
@@ -76,7 +76,7 @@ export function Login() {
             {busy ? 'abrindo…' : 'Entrar'}
           </button>
 
-          <p className="text-center font-mono text-[11px] text-muted">
+          <p className="text-center text-[11px] text-muted">
             Acesso restrito. Novas contas só por convite.
           </p>
         </form>

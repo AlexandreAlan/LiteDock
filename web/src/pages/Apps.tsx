@@ -45,7 +45,7 @@ export function Apps() {
           {projects
             .filter((p) => (p.services?.length ?? 0) > 0)
             .map((p) => (
-              <Card key={p.id} title={p.name} right={<span className="font-mono text-xs text-muted">{p.services?.length} serviço(s)</span>}>
+              <Card key={p.id} title={p.name} right={<span className="text-xs text-muted">{p.services?.length} serviço(s)</span>}>
                 <ul className="grid gap-3 sm:grid-cols-2">
                   {(p.services ?? []).map((s) => (
                     <li key={s.id}>
@@ -55,8 +55,8 @@ export function Apps() {
                       >
                         <StatusDot state={s.status} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-mono text-sm text-ink">{s.name}</div>
-                          <div className="truncate font-mono text-[11px] text-muted">
+                          <div className="truncate text-sm text-ink">{s.name}</div>
+                          <div className="truncate text-[11px] text-muted">
                             {s.image || s.type}
                           </div>
                         </div>

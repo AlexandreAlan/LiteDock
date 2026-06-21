@@ -41,7 +41,7 @@ export function ServiceDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 font-mono text-xs text-muted">
+      <div className="flex items-center gap-2 text-xs text-muted">
         <Link to="/apps" className="hover:text-brand-bright">
           apps
         </Link>
@@ -54,7 +54,7 @@ export function ServiceDetail() {
           <StatusDot state={s.status} />
           <div>
             <h1 className="font-display text-2xl font-semibold text-ink">{s.name}</h1>
-            <p className="font-mono text-xs text-muted">{s.image || s.type}</p>
+            <p className="text-xs text-muted">{s.image || s.type}</p>
           </div>
         </div>
         {/* Ações guardadas pelo modo seguro */}
@@ -77,7 +77,7 @@ export function ServiceDetail() {
           {logs.isLoading ? (
             <Spinner />
           ) : logText ? (
-            <pre className="max-h-80 overflow-auto rounded-md bg-bg p-3 font-mono text-[11px] leading-relaxed text-ink/80">
+            <pre className="max-h-80 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">
               {logText}
             </pre>
           ) : (
@@ -93,22 +93,22 @@ export function ServiceDetail() {
                 <Gauge label="memória" value={stats.data.memPct ?? 0} tone="brand" />
               </div>
             ) : (
-              <p className="font-mono text-xs text-muted">Métricas indisponíveis no modo atual.</p>
+              <p className="text-xs text-muted">Métricas indisponíveis no modo atual.</p>
             )}
           </Card>
 
-          <Card title="Variáveis de ambiente" right={<span className="font-mono text-xs text-muted">{s.env?.length ?? 0}</span>}>
+          <Card title="Variáveis de ambiente" right={<span className="text-xs text-muted">{s.env?.length ?? 0}</span>}>
             {s.env && s.env.length > 0 ? (
               <ul className="space-y-1.5">
                 {s.env.map((v) => (
-                  <li key={v.key} className="flex items-center justify-between gap-2 font-mono text-xs">
+                  <li key={v.key} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-brand-bright">{v.key}</span>
                     <span className="truncate text-muted">••••••</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="font-mono text-xs text-muted">Nenhuma variável definida.</p>
+              <p className="text-xs text-muted">Nenhuma variável definida.</p>
             )}
           </Card>
 
@@ -116,7 +116,7 @@ export function ServiceDetail() {
             <Card title="Domínios">
               <ul className="space-y-1.5">
                 {s.domains.map((d) => (
-                  <li key={d.id} className="font-mono text-xs text-ink">
+                  <li key={d.id} className="text-xs text-ink">
                     {d.host}
                   </li>
                 ))}

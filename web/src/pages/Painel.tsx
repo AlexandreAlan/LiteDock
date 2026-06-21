@@ -30,15 +30,15 @@ export function Painel() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-semibold text-ink">Painel</h1>
-        <p className="stamp mt-1">visão geral da casa de máquinas</p>
+        <p className="stamp mt-1">Visão geral do servidor</p>
       </div>
 
       {/* Placar */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Stat label="apps" value={appCount} hint={`${projects.data?.length ?? 0} projeto(s)`} />
-        <Stat label="contêineres" value={`${running}/${total}`} hint="no ar / total" />
-        <Stat label="imagens" value={e?.images ?? '—'} hint="baixadas" />
-        <Stat label="memória" value={gb(e?.memTotal)} hint={`${e?.ncpu ?? '—'} vCPU`} />
+        <Stat label="Apps" value={appCount} hint={`${projects.data?.length ?? 0} projeto(s)`} />
+        <Stat label="Contêineres" value={`${running}/${total}`} hint="no ar / total" />
+        <Stat label="Imagens" value={e?.images ?? '—'} hint="baixadas" />
+        <Stat label="Memória" value={gb(e?.memTotal)} hint={`${e?.ncpu ?? '—'} vCPU`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
@@ -54,11 +54,11 @@ export function Painel() {
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div className="plate-2 p-3">
                 <div className="stamp mb-1">engine</div>
-                <div className="font-mono text-sm text-ink">{e?.serverVersion ?? '—'}</div>
+                <div className="text-sm text-ink">{e?.serverVersion ?? '—'}</div>
               </div>
               <div className="plate-2 p-3">
                 <div className="stamp mb-1">host</div>
-                <div className="truncate font-mono text-sm text-ink">{e?.name ?? '—'}</div>
+                <div className="truncate text-sm text-ink">{e?.name ?? '—'}</div>
               </div>
             </div>
           </div>
@@ -67,7 +67,7 @@ export function Painel() {
         {/* Unidades em operação */}
         <Card
           title="Unidades em operação"
-          right={<span className="font-mono text-xs text-muted">{units.length}</span>}
+          right={<span className="text-xs text-muted">{units.length}</span>}
         >
           {containers.isLoading ? (
             <Spinner />
@@ -80,16 +80,16 @@ export function Painel() {
                   <StatusDot state={c.state} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-mono text-sm text-ink">{c.name}</span>
+                      <span className="truncate text-sm text-ink">{c.name}</span>
                       {c.managed && (
                         <span className="rounded border border-brand-dim/50 px-1.5 py-0.5 font-display text-[9px] font-medium text-brand-bright">
                           litedock
                         </span>
                       )}
                     </div>
-                    <div className="truncate font-mono text-[11px] text-muted">{c.image}</div>
+                    <div className="truncate text-[11px] text-muted">{c.image}</div>
                   </div>
-                  <span className="shrink-0 font-mono text-[11px] text-muted">{c.status}</span>
+                  <span className="shrink-0 text-[11px] text-muted">{c.status}</span>
                 </li>
               ))}
             </ul>
@@ -97,7 +97,7 @@ export function Painel() {
         </Card>
       </div>
 
-      <p className="text-center font-mono text-[11px] text-muted">
+      <p className="text-center text-[11px] text-muted">
         <Link to="/vps" className="text-brand hover:text-brand-bright">
           ver VPS completa →
         </Link>

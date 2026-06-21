@@ -35,7 +35,7 @@ export function Layout() {
             <div className="font-display text-lg font-bold text-ink">
               LITEDOCK
             </div>
-            <div className="stamp">casa de máquinas</div>
+            <div className="stamp">servidor local</div>
           </div>
         </div>
 
@@ -62,11 +62,11 @@ export function Layout() {
         <div className="border-t border-line px-4 py-4">
           <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-brand-dim/40 bg-brand/10 px-2.5 py-1">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-            <span className="stamp text-brand-bright">modo seguro</span>
+            <span className="stamp text-brand-bright">Modo seguro</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <div className="truncate font-mono text-xs text-ink">
+              <div className="truncate text-xs text-ink">
                 {user?.name || user?.email}
               </div>
               <div className="stamp">{user?.role}</div>
@@ -89,8 +89,8 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-line bg-panel/60 px-6 py-3 backdrop-blur">
           <div className="flex items-center gap-2">
-            <span className="stamp">pressão do sistema</span>
-            <span className="font-mono text-xs text-muted">
+            <span className="stamp">Sistema</span>
+            <span className="text-xs text-muted">
               {running}/{total} unidades
             </span>
           </div>

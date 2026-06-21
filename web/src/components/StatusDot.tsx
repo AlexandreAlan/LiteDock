@@ -16,7 +16,7 @@ export function StatusDot({ state, withLabel = false }: { state?: string | null;
   return (
     <span className="inline-flex items-center gap-2">
       <span className={`inline-block h-2.5 w-2.5 rounded-full ${s.dot} ${s.ring}`} />
-      {withLabel && <span className="font-mono text-xs text-muted">{s.label}</span>}
+      {withLabel && <span className="text-xs text-muted">{s.label}</span>}
     </span>
   );
 }

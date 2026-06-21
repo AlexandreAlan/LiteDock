@@ -27,14 +27,14 @@ export function Vps() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-semibold text-ink">VPS</h1>
-        <p className="stamp mt-1">a máquina por baixo de tudo</p>
+        <p className="stamp mt-1">Servidor e contêineres</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat label="vCPU" value={e?.ncpu ?? '—'} />
-        <Stat label="memória" value={gb(e?.memTotal)} />
-        <Stat label="contêineres" value={`${running}/${total}`} hint="no ar / total" />
-        <Stat label="imagens" value={e?.images ?? '—'} />
+        <Stat label="Memória" value={gb(e?.memTotal)} />
+        <Stat label="Contêineres" value={`${running}/${total}`} hint="no ar / total" />
+        <Stat label="Imagens" value={e?.images ?? '—'} />
       </div>
 
       <Card title="Telemetria do host">
@@ -45,22 +45,22 @@ export function Vps() {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="plate-2 p-3">
             <div className="stamp mb-1">engine</div>
-            <div className="font-mono text-sm text-ink">{e?.serverVersion ?? '—'}</div>
+            <div className="text-sm text-ink">{e?.serverVersion ?? '—'}</div>
           </div>
           <div className="plate-2 p-3">
             <div className="stamp mb-1">host</div>
-            <div className="truncate font-mono text-sm text-ink">{e?.name ?? '—'}</div>
+            <div className="truncate text-sm text-ink">{e?.name ?? '—'}</div>
           </div>
           <div className="plate-2 p-3">
             <div className="stamp mb-1">parados</div>
-            <div className="font-mono text-sm text-ink">{stopped}</div>
+            <div className="text-sm text-ink">{stopped}</div>
           </div>
         </div>
       </Card>
 
       <Card
         title="Todos os contêineres"
-        right={<span className="font-mono text-xs text-muted">{list.length}</span>}
+        right={<span className="text-xs text-muted">{list.length}</span>}
       >
         {containers.isLoading ? (
           <Spinner />
@@ -84,15 +84,15 @@ export function Vps() {
                       <StatusDot state={c.state} withLabel />
                     </td>
                     <td className="py-2.5 pr-3">
-                      <span className="font-mono text-sm text-ink">{c.name}</span>
+                      <span className="text-sm text-ink">{c.name}</span>
                       {c.managed && (
                         <span className="ml-2 rounded border border-brand-dim/50 px-1.5 py-0.5 font-display text-[9px] font-medium text-brand-bright">
                           litedock
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 pr-3 font-mono text-[11px] text-muted">{c.image}</td>
-                    <td className="py-2.5 font-mono text-[11px] text-muted">{c.status}</td>
+                    <td className="py-2.5 pr-3 text-[11px] text-muted">{c.image}</td>
+                    <td className="py-2.5 text-[11px] text-muted">{c.status}</td>
                   </tr>
                 ))}
               </tbody>

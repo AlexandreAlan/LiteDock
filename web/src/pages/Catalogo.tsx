@@ -27,7 +27,7 @@ export function Catalogo() {
 
       <div className="flex items-center gap-2 rounded-md border border-brand-dim/40 bg-brand/10 px-3 py-2">
         <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-        <span className="font-mono text-xs text-brand-bright">
+        <span className="text-xs text-brand-bright">
           Modo seguro ligado — instalar está desativado até você liberar a produção.
         </span>
       </div>
@@ -42,7 +42,7 @@ export function Catalogo() {
                 <span className="stamp">{t.tag}</span>
               </div>
             </div>
-            <p className="mt-3 flex-1 font-mono text-xs leading-relaxed text-muted">{t.desc}</p>
+            <p className="mt-3 flex-1 text-xs leading-relaxed text-muted">{t.desc}</p>
             <button
               className="btn-ghost mt-4 w-full opacity-60"
               onClick={() => setPicked(t.key)}
@@ -61,7 +61,7 @@ export function Catalogo() {
         >
           <div className="plate max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-display text-xl text-ink">Instalação em modo seguro</h2>
-            <p className="mt-3 font-mono text-sm leading-relaxed text-muted">
+            <p className="mt-3 text-sm leading-relaxed text-muted">
               O LiteDock está rodando com as ações de deploy travadas para proteger os
               sistemas que já operam nesta VPS. Quando a gente ligar a produção, este
               botão sobe o <span className="text-brand-bright">{picked}</span> de verdade.
