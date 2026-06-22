@@ -133,6 +133,28 @@ export interface EngineInfo {
   name?: string;
   [k: string]: unknown;
 }
+export interface ContainerStat {
+  id: string;
+  name: string;
+  project: string | null;
+  managed: boolean;
+  cpuPct: number;
+  memBytes: number;
+  netInBps: number;
+  netOutBps: number;
+}
+export interface DockerEvent {
+  type: string;
+  action: string;
+  time: number;
+  name?: string;
+}
+export interface StorageItem {
+  name: string;
+  kind: 'container' | 'volume';
+  sizeBytes: number;
+  path: string;
+}
 export interface HostContainer {
   id: string;
   name: string;
