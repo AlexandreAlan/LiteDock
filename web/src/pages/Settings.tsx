@@ -41,8 +41,8 @@ export function Settings() {
       </Card>
 
       <Card title="Sobre">
-        {row('LiteDock', 'v0.2.0')}
-        {row('Modo de deploy', <span className="text-brand-ink">Seguro (ações guardadas)</span>)}
+        {row('LiteDock', 'v0.6.0')}
+        {row('Modo de deploy', <span className="text-ok">Ativo</span>)}
       </Card>
     </div>
   );

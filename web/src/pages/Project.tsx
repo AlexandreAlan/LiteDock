@@ -59,7 +59,7 @@ export function Project() {
         <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => setStore(true)}>⚡ Templates</button>
-          <button className="btn-brand" onClick={() => setOpen(true)}>+ Create Service</button>
+          <button className="btn-brand" onClick={() => setOpen(true)}>+ Criar serviço</button>
         </div>
       </div>
 
@@ -70,25 +70,23 @@ export function Project() {
           action={
             <div className="flex items-center gap-2">
               <button className="btn-brand" onClick={() => setStore(true)}>⚡ Ver Templates</button>
-              <button className="btn-ghost" onClick={() => setOpen(true)}>+ Create Service</button>
+              <button className="btn-ghost" onClick={() => setOpen(true)}>+ Criar serviço</button>
             </div>
           }
         />
       ) : (
-        <div className="card divide-y divide-line">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((s) => (
-            <Link key={s.id} to={`/service/${s.id}`} className="flex items-center gap-3 p-4 transition-colors hover:bg-panel2">
+            <Link key={s.id} to={`/service/${s.id}`} className="card flex items-center gap-3 p-4 transition-shadow hover:shadow-pop">
               <ServiceGlyph type={s.type} name={s.name} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-ink">{s.name}</span>
+                  <span className="truncate font-medium text-ink">{s.name}</span>
                   <TypeBadge type={s.type} spec={s.spec} />
                 </div>
-                <div className="mt-0.5">
-                  <StatusDot state={s.status} withLabel />
-                </div>
+                <div className="mt-0.5 text-xs text-muted">{s.type === 'app' ? 'app' : 'database'}</div>
               </div>
-              <span className="text-muted">›</span>
+              <StatusDot state={s.status} />
             </Link>
           ))}
         </div>
@@ -97,18 +95,18 @@ export function Project() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Create service"
+        title="Criar serviço"
         footer={
           <>
-            <button className="btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>
             <button className="btn-brand" disabled={!name || create.isPending} onClick={() => create.mutate()}>
-              {create.isPending ? 'Creating…' : 'Create'}
+              {create.isPending ? 'Criando…' : 'Criar'}
             </button>
           </>
         }
       >
         <div>
-          <label className="label mb-1.5 block">Type</label>
+          <label className="label mb-1.5 block">Tipo</label>
           <div className="grid grid-cols-2 gap-2">
             {(['app', 'database'] as ServiceType[]).map((t) => (
               <button
@@ -127,7 +125,7 @@ export function Project() {
 
         {type === 'database' && (
           <div>
-            <label className="label mb-1.5 block">Engine</label>
+            <label className="label mb-1.5 block">Banco</label>
             <div className="flex flex-wrap gap-2">
               {DB_ENGINES.map((e) => (
                 <button
@@ -146,7 +144,7 @@ export function Project() {
         )}
 
         <div>
-          <label className="label mb-1 block">Name</label>
+          <label className="label mb-1 block">Nome</label>
           <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === 'app' ? 'website' : 'db'} autoFocus />
         </div>
         {err && <ErrorNote message={err} />}
