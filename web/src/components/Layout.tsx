@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, type HostMetrics } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useTheme } from '../lib/theme';
+import { CommandPalette } from './CommandPalette';
 
 const NAV = [
   { to: '/', label: 'Projects', end: true, icon: '▦' },
@@ -20,14 +23,29 @@ const LINKS = [
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
+  const [palette, setPalette] = useState(false);
   const { data: m } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => api.get<HostMetrics>('/servers/local/metrics'),
     refetchInterval: 5000,
   });
 
+  // Atalho global ⌘K / Ctrl+K abre a paleta de comandos.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPalette((p) => !p);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="flex h-full">
+      <CommandPalette open={palette} onClose={() => setPalette(false)} />
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex items-center gap-2.5 px-4 py-4">
@@ -40,7 +58,10 @@ export function Layout() {
 
         {/* Busca rápida (⌘K) */}
         <div className="px-3 pb-3">
-          <button className="flex w-full items-center justify-between rounded-lg border border-line bg-panel2 px-3 py-2 text-sm text-muted transition-colors hover:border-brand/40">
+          <button
+            onClick={() => setPalette(true)}
+            className="flex w-full items-center justify-between rounded-lg border border-line bg-panel2 px-3 py-2 text-sm text-muted transition-colors hover:border-brand/40"
+          >
             <span className="flex items-center gap-2">
               <span className="text-muted">⌕</span> Busca rápida
             </span>
@@ -86,12 +107,21 @@ export function Layout() {
         <div className="mt-auto border-t border-line p-4">
           <div className="mb-3 flex items-center gap-2 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-            <span className="font-medium text-ink">{m?.hostname ?? 'servidor'}</span>
+            <span className="font-mono font-medium text-ink">{m?.publicIp ?? m?.hostname ?? 'servidor'}</span>
             <span>· {m?.cpu.cores ?? '—'} cores</span>
           </div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-            <span className="text-xs font-medium text-brand-ink">Modo seguro</span>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+              <span className="text-xs font-medium text-brand-ink">Modo seguro</span>
+            </div>
+            <button
+              onClick={toggle}
+              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+              className="ml-auto rounded-lg border border-line px-2 py-1 text-sm text-ink transition-colors hover:bg-panel2"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
           </div>
           <div className="flex items-center justify-between">
             <div className="min-w-0">

@@ -4,6 +4,36 @@ import { readFile, statfs } from 'node:fs/promises';
 
 let lastNet: { rx: number; tx: number; t: number } | null = null;
 
+// IP público: resolvido uma vez e cacheado pra vida do processo.
+let publicIp: string | null = null;
+let publicIpTried = false;
+
+// Primeiro IPv4 não-interno das interfaces (fallback offline).
+function localIp(): string {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const i of ifaces ?? []) {
+      if (i.family === 'IPv4' && !i.internal) return i.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+async function resolvePublicIp(): Promise<string> {
+  if (publicIp) return publicIp;
+  if (!publicIpTried) {
+    publicIpTried = true;
+    try {
+      const ctrl = AbortController ? new AbortController() : null;
+      const t = ctrl ? setTimeout(() => ctrl.abort(), 1500) : null;
+      const res = await fetch('https://api.ipify.org', { signal: ctrl?.signal });
+      if (t) clearTimeout(t);
+      const ip = (await res.text()).trim();
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) publicIp = ip;
+    } catch { /* offline: usa o IP local */ }
+  }
+  return publicIp ?? localIp();
+}
+
 async function readCpu() {
   const data = await readFile('/proc/stat', 'utf8');
   const parts = data.split('\n')[0].trim().split(/\s+/).slice(1).map(Number);
@@ -68,6 +98,7 @@ export async function hostMetrics() {
 
   return {
     hostname: os.hostname(),
+    publicIp: await resolvePublicIp(),
     uptimeSec: Math.round(os.uptime()),
     cpu: { pct: +cpuPct.toFixed(1), cores: os.cpus().length, load: os.loadavg().map((n) => +n.toFixed(2)) },
     memory: { usedBytes: mem.used, totalBytes: mem.total, pct: mem.total ? +((mem.used / mem.total) * 100).toFixed(1) : 0 },

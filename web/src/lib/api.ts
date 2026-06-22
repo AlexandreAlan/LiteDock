@@ -133,6 +133,7 @@ export interface HostContainer {
 }
 export interface HostMetrics {
   hostname: string;
+  publicIp?: string;
   uptimeSec: number;
   cpu: { pct: number; cores: number; load: number[] };
   memory: { usedBytes: number; totalBytes: number; pct: number };

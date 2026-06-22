@@ -11,8 +11,39 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tema claro (default) — neutros + verde EasyPanel. Triplos RGB p/ alpha. */
   :root {
     color-scheme: light;
+    --c-bg: 250 250 250;        /* neutral-50 */
+    --c-panel: 255 255 255;     /* branco */
+    --c-panel2: 245 245 245;    /* neutral-100 */
+    --c-ink: 23 23 23;          /* neutral-900 */
+    --c-muted: 115 115 115;     /* neutral-500 */
+    --c-line: 229 229 229;      /* neutral-200 */
+    --c-brand: 5 150 105;       /* emerald-600 */
+    --c-brand-bright: 4 120 87; /* emerald-700 */
+    --c-brand-dim: 209 250 229; /* emerald-100 */
+    --c-brand-ink: 6 95 70;     /* emerald-800 */
+    --c-ok: 22 163 74;
+    --c-warn: 217 119 6;
+    --c-bad: 220 38 38;
+  }
+  /* Tema escuro (Modo oscuro do EasyPanel) — neutros 900/800 + verde mais vivo. */
+  .dark {
+    color-scheme: dark;
+    --c-bg: 10 10 10;           /* neutral-950 */
+    --c-panel: 23 23 23;        /* neutral-900 */
+    --c-panel2: 38 38 38;       /* neutral-800 */
+    --c-ink: 245 245 245;       /* neutral-100 */
+    --c-muted: 163 163 163;     /* neutral-400 */
+    --c-line: 64 64 64;         /* neutral-700 */
+    --c-brand: 16 185 129;      /* emerald-500 */
+    --c-brand-bright: 52 211 153;/* emerald-400 */
+    --c-brand-dim: 6 78 59;     /* emerald-900 */
+    --c-brand-ink: 110 231 183; /* emerald-300 */
+    --c-ok: 34 197 94;
+    --c-warn: 245 158 11;
+    --c-bad: 248 113 113;
   }
   html,
   body,
@@ -33,7 +64,7 @@
     @apply bg-muted/50;
   }
   ::selection {
-    background: rgba(37, 99, 235, 0.16);
+    background: rgb(var(--c-brand) / 0.18);
   }
 }
 

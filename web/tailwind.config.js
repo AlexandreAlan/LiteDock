@@ -2,25 +2,27 @@
 // Idêntico ao EasyPanel atual: tema claro neutro (shadcn/ui) + acento VERDE.
 // Cores extraídas da demo ao vivo (demo.easypanel.io) e da UI oficial.
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Tokens via CSS vars (triplos RGB) — alternam claro/escuro em index.css.
       colors: {
-        bg: '#FAFAFA', // fundo da página (neutral-50)
-        panel: '#FFFFFF', // cards / sidebar (branco)
-        panel2: '#F5F5F5', // insets / hover (neutral-100)
-        ink: '#171717', // texto principal (neutral-900)
-        muted: '#737373', // rótulos / ajuda (neutral-500)
-        line: '#E5E5E5', // bordas (neutral-200)
+        bg: 'rgb(var(--c-bg) / <alpha-value>)',
+        panel: 'rgb(var(--c-panel) / <alpha-value>)',
+        panel2: 'rgb(var(--c-panel2) / <alpha-value>)',
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        muted: 'rgb(var(--c-muted) / <alpha-value>)',
+        line: 'rgb(var(--c-line) / <alpha-value>)',
         brand: {
-          DEFAULT: '#059669', // verde EasyPanel (emerald-600)
-          bright: '#047857', // hover (emerald-700)
-          dim: '#D1FAE5', // verde bem claro (emerald-100) p/ chips/ativos
-          ink: '#065F46', // verde escuro p/ texto (emerald-800)
+          DEFAULT: 'rgb(var(--c-brand) / <alpha-value>)',
+          bright: 'rgb(var(--c-brand-bright) / <alpha-value>)',
+          dim: 'rgb(var(--c-brand-dim) / <alpha-value>)',
+          ink: 'rgb(var(--c-brand-ink) / <alpha-value>)',
         },
-        ok: '#16A34A', // running
-        warn: '#D97706', // atenção
-        bad: '#DC2626', // destrutivo / falha
+        ok: 'rgb(var(--c-ok) / <alpha-value>)',
+        warn: 'rgb(var(--c-warn) / <alpha-value>)',
+        bad: 'rgb(var(--c-bad) / <alpha-value>)',
       },
       fontFamily: {
         display: ['Inter', 'system-ui', 'sans-serif'],
