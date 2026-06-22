@@ -14,6 +14,7 @@ Painel de gerenciamento de servidores e deploys — mesma proposta do EasyPanel
 | Banco de estado | **PostgreSQL** · Prisma (ORM + migrations) |
 | Fila / jobs | Redis · BullMQ |
 | Docker | **dockerode** (Docker Engine API) |
+| Automação de deploy | **Python · FastAPI** (worker no loopback) |
 | Proxy / data plane | **Traefik** (labels + Let's Encrypt) |
 | Build sem Dockerfile | Nixpacks |
 | Frontend | React · Vite · Tailwind |
@@ -23,12 +24,21 @@ Painel de gerenciamento de servidores e deploys — mesma proposta do EasyPanel
 ```
 navegador ─HTTPS→ Traefik ─→ containers (apps do usuário)
                      ▲ labels
-LiteDock API (Fastify) ─dockerode→ Docker Engine
-   ├─ Postgres (estado)   └─ Redis (fila + pub/sub de logs)
+LiteDock API (Fastify) ──┬─dockerode→ Docker Engine
+   ├─ Postgres (estado)  └─HTTP loopback→ Deploy Worker (FastAPI/Python)
+   └─ Redis (fila + pub/sub de logs)
 ```
 
 A API (control plane) nunca expõe o `docker.sock`; toda mutação passa pela
 camada de orquestração validada. Multi-servidor (futuro) via agentes.
+
+**Divisão de responsabilidades (catálogo vs. automação):** o catálogo/loja de
+templates e os registros de serviço ficam no Node (CRUD). A automação "braçal"
+do deploy (pull de imagem, subir/parar/remover container, logs) é delegada a um
+**worker Python (FastAPI)** no loopback (`127.0.0.1:8089`), nos moldes de um
+worker de automação. O worker arranca em **modo seguro** (`SAFE_MODE=true`):
+devolve o *plano* (dry-run) com o `docker run` equivalente, sem tocar no Docker,
+até ser liberado com `SAFE_MODE=false`.
 
 ## Modelo de dados
 
@@ -80,6 +90,16 @@ npm run dev        # http://127.0.0.1:8088
 | GET | `/services/:id/logs?tail=N` | logs do container |
 | GET | `/services/:id/stats` | métricas CPU/memória |
 
+### Endpoints (loja de templates + worker Python)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/templates` | catálogo de apps prontos (categorias + cards) |
+| GET | `/templates/:slug` | detalhe de um template |
+| POST | `/templates/:slug/install` | instala no projeto (cria serviços + envs/segredos) |
+| POST | `/services/:id/plan` | monta o spec e **delega ao worker Python** (deploy real / dry-run) |
+| GET | `/services/worker/health` | saúde do worker e estado do modo seguro |
+
 ### Subindo o Traefik (data plane)
 
 ```bash
@@ -90,6 +110,19 @@ docker compose -f docker-compose.traefik.yml up -d
 > Traefik só roteia containers com label `litedock.managed=true` (constraint),
 > em portas loopback alternativas — **não conflita com o nginx do host (80/443)**.
 
+### Subindo o Deploy Worker (Python)
+
+```bash
+cd deploy-worker
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+# modo seguro (dry-run) por padrão; loopback 127.0.0.1:8089
+SAFE_MODE=true uvicorn main:app --host 127.0.0.1 --port 8089
+```
+
+> O Node fala com o worker via `DEPLOY_WORKER_URL` (default `http://127.0.0.1:8089`).
+> Em produção sobe via pm2 no loopback. Para deploy real: `SAFE_MODE=false`.
+
 ## Roadmap (fases do MVP)
 
 - **Fase 0** — Fundação: scaffold, auth, Postgres/Redis, camada Docker ✅
@@ -97,5 +130,16 @@ docker compose -f docker-compose.traefik.yml up -d
 - **Fase 2** — Build de código (Git + Nixpacks + webhooks CI/CD)
 - **Fase 3** — Bancos de dados 1-clique + backups
 - **Fase 4** — Observabilidade (logs, métricas, terminal web)
-- **Fase 5** — App Store (templates Docker Compose)
+- **Fase 5** — App Store (loja de templates 1-clique) 🚧 catálogo + instalação ✅; deploy real via worker Python (modo seguro)
 - **Fase 6** — Multi-usuário, multi-servidor, billing
+
+## Histórico de versões
+
+- **v0.4** — Loja de templates estilo EasyPanel (22 apps, instalação 1-clique cria
+  serviços + envs/segredos) e **worker de deploy em Python (FastAPI)** no loopback,
+  com modo seguro (dry-run). Node delega a automação ao worker via `/services/:id/plan`.
+- **v0.3** — Paridade visual com o EasyPanel: paleta de comandos ⌘K funcional,
+  modo escuro (tokens via CSS vars + persistência), IP público real no rodapé.
+- **v0.2** — Fase 1: deploy real por imagem, domínios via Traefik, env cifrada
+  (AES-256-GCM), logs/métricas e ciclo de vida dos serviços.
+- **v0.1** — Fase 0: fundação (scaffold, auth/JWT, Postgres/Redis, camada Docker).

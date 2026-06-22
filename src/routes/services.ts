@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { encrypt } from '../lib/crypto.js';
+import { encrypt, decrypt } from '../lib/crypto.js';
 import * as deploy from '../services/deploy.js';
+import { workerDeploy, workerHealth, type WorkerSpec } from '../services/worker.js';
 
 // Carrega um serviço garantindo que pertence a um projeto do usuário logado.
 async function loadOwned(req: FastifyRequest, id: string) {
@@ -80,6 +81,43 @@ export default async function serviceRoutes(app: FastifyInstance) {
       return result;
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
+
+  // ---- deploy via worker Python (automação) ----
+  // Monta o spec a partir do registro e delega pro worker FastAPI.
+  // Em modo seguro, o worker devolve o "plano" (dry-run) sem tocar no Docker.
+  app.post('/:id/plan', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const spec = (s.spec ?? {}) as { image?: string; ports?: number[]; volumes?: string[] };
+    if (!spec.image) return reply.code(400).send({ error: 'serviço sem imagem no spec' });
+
+    const env: Record<string, string> = {};
+    for (const e of s.envVars) env[e.key] = e.isSecret ? decrypt(e.value) : e.value;
+
+    const payload: WorkerSpec = {
+      name: s.name,
+      image: spec.image,
+      project: s.project.slug,
+      ports: spec.ports ?? [],
+      volumes: spec.volumes ?? [],
+      env,
+    };
+    try {
+      return await workerDeploy(payload);
+    } catch (e) {
+      return reply.code(502).send({ error: (e as Error).message });
+    }
+  });
+
+  // Saúde do worker (mostra se está em modo seguro).
+  app.get('/worker/health', async (_req, reply) => {
+    try {
+      return await workerHealth();
+    } catch (e) {
+      return reply.code(502).send({ error: (e as Error).message });
     }
   });
 

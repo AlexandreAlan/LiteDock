@@ -148,3 +148,17 @@ export interface DomainFull {
   certStatus: string;
   service?: { id: string; name: string; project?: { id: string; name: string } };
 }
+export interface TemplateCard {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  logo: string;
+  website?: string;
+  serviceCount: number;
+  images: string[];
+}
+export interface TemplateCatalog {
+  categories: string[];
+  templates: TemplateCard[];
+}

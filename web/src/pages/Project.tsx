@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project as TProject, type Service, type ServiceType } from '../lib/api';
 import { Modal } from '../components/Modal';
+import { TemplateCatalog } from '../components/TemplateCatalog';
 import { Spinner, Empty, ErrorNote } from '../components/ui';
 import { StatusDot } from '../components/StatusDot';
 import { TypeBadge, ServiceGlyph } from '../components/badges';
@@ -18,6 +19,7 @@ export function Project() {
   });
 
   const [open, setOpen] = useState(false);
+  const [store, setStore] = useState(false);
   const [type, setType] = useState<ServiceType>('app');
   const [engine, setEngine] = useState('postgres');
   const [name, setName] = useState('');
@@ -55,14 +57,22 @@ export function Project() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
-        <button className="btn-brand" onClick={() => setOpen(true)}>+ Create Service</button>
+        <div className="flex items-center gap-2">
+          <button className="btn-ghost" onClick={() => setStore(true)}>⚡ Templates</button>
+          <button className="btn-brand" onClick={() => setOpen(true)}>+ Create Service</button>
+        </div>
       </div>
 
       {services.length === 0 ? (
         <Empty
-          title="No services yet"
-          hint="Add an app or a database to this project."
-          action={<button className="btn-brand" onClick={() => setOpen(true)}>+ Create Service</button>}
+          title="Nenhum serviço ainda"
+          hint="Instale um app pronto pela loja de Templates ou crie um serviço do zero."
+          action={
+            <div className="flex items-center gap-2">
+              <button className="btn-brand" onClick={() => setStore(true)}>⚡ Ver Templates</button>
+              <button className="btn-ghost" onClick={() => setOpen(true)}>+ Create Service</button>
+            </div>
+          }
         />
       ) : (
         <div className="card divide-y divide-line">
@@ -141,6 +151,8 @@ export function Project() {
         </div>
         {err && <ErrorNote message={err} />}
       </Modal>
+
+      <TemplateCatalog projectId={id} open={store} onClose={() => setStore(false)} />
     </div>
   );
 }

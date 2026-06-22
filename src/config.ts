@@ -22,4 +22,6 @@ export const config = {
   redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6390',
   encryptionKey: process.env.ENCRYPTION_KEY || 'dev-encryption-key-change-me-32bytes',
   traefikNetwork: process.env.TRAEFIK_NETWORK || 'litedock',
+  // Worker de automação de deploy (Python/FastAPI, loopback).
+  deployWorkerUrl: process.env.DEPLOY_WORKER_URL || 'http://127.0.0.1:8089',
 };
