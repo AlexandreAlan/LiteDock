@@ -111,6 +111,17 @@ model Credential {
   createdAt DateTime @default(now())
 }
 
+// Agendamento de liga/desliga de um container do host (diário, hora local).
+model ContainerSchedule {
+  id            String   @id @default(uuid())
+  containerName String   @unique
+  startTime     String? // "HH:MM" — liga nesse horário (diário)
+  stopTime      String? // "HH:MM" — desliga nesse horário
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Backup {
   id        String   @id @default(uuid())
   serviceId String

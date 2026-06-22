@@ -133,15 +133,23 @@ export interface EngineInfo {
   name?: string;
   [k: string]: unknown;
 }
+export interface ScheduleInfo {
+  startTime: string | null;
+  stopTime: string | null;
+  enabled: boolean;
+}
 export interface ContainerStat {
   id: string;
   name: string;
   project: string | null;
   managed: boolean;
+  state: string;
+  running: boolean;
   cpuPct: number;
   memBytes: number;
   netInBps: number;
   netOutBps: number;
+  schedule: ScheduleInfo | null;
 }
 export interface DockerEvent {
   type: string;

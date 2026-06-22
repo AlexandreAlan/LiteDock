@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../db.js';
 import { listContainers, engineInfo } from '../services/docker.js';
 import { hostMetrics } from '../services/metrics.js';
-import { containerStats, dockerEvents, storage } from '../services/monitor.js';
+import { containerStats, dockerEvents, storage, startContainer, stopContainer } from '../services/monitor.js';
 
 export default async function serverRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate);
@@ -22,4 +24,36 @@ export default async function serverRoutes(app: FastifyInstance) {
     return dockerEvents(Number(limit) || 60);
   });
   app.get('/local/storage', async () => storage());
+
+  // Ações por container do host: iniciar / parar (mexe em containers reais).
+  app.post('/local/containers/:name/start', async (req, reply) => {
+    const { name } = req.params as { name: string };
+    try { await startContainer(name); return { ok: true }; }
+    catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
+  });
+  app.post('/local/containers/:name/stop', async (req, reply) => {
+    const { name } = req.params as { name: string };
+    try { await stopContainer(name); return { ok: true }; }
+    catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
+  });
+
+  // Agendamento diário (liga/desliga por horário) por container.
+  app.put('/local/containers/:name/schedule', async (req) => {
+    const { name } = req.params as { name: string };
+    const body = z.object({
+      startTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+      stopTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+      enabled: z.boolean().optional(),
+    }).parse(req.body);
+    return prisma.containerSchedule.upsert({
+      where: { containerName: name },
+      create: { containerName: name, startTime: body.startTime ?? null, stopTime: body.stopTime ?? null, enabled: body.enabled ?? true },
+      update: { startTime: body.startTime ?? null, stopTime: body.stopTime ?? null, ...(body.enabled !== undefined ? { enabled: body.enabled } : {}) },
+    });
+  });
+  app.delete('/local/containers/:name/schedule', async (req) => {
+    const { name } = req.params as { name: string };
+    await prisma.containerSchedule.deleteMany({ where: { containerName: name } });
+    return { ok: true };
+  });
 }

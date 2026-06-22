@@ -3,6 +3,7 @@
 //  • stream de eventos do Docker (buffer em memória)
 //  • uso de armazenamento (containers + volumes via `docker system df`)
 import { docker } from './docker.js';
+import { prisma } from '../db.js';
 
 // ── Stats por container ──────────────────────────────────────────────────
 type NetSnap = { rx: number; tx: number; t: number };
@@ -20,23 +21,36 @@ function sumNet(s: any): { rx: number; tx: number } {
   return { rx, tx };
 }
 
+export interface ScheduleInfo { startTime: string | null; stopTime: string | null; enabled: boolean }
 export interface ContainerStat {
   id: string; name: string; project: string | null; managed: boolean;
+  state: string; running: boolean;
   cpuPct: number; memBytes: number; netInBps: number; netOutBps: number;
+  schedule: ScheduleInfo | null;
 }
 
 export async function containerStats(): Promise<ContainerStat[]> {
-  const list = await docker.listContainers(); // só os em execução
+  const [list, schedules] = await Promise.all([
+    docker.listContainers({ all: true }), // todos (inclui parados)
+    prisma.containerSchedule.findMany(),
+  ]);
+  const sched = new Map(schedules.map((s) => [s.containerName, s]));
   const now = Date.now();
   const rows = await Promise.all(
     list.map(async (c) => {
       const name = (c.Names?.[0] || '').replace(/^\//, '');
+      const running = c.State === 'running';
+      const s0 = sched.get(name);
       const base = {
         id: c.Id.slice(0, 12),
         name,
         project: (c.Labels?.['litedock.project'] as string) || null,
         managed: c.Labels?.['litedock.managed'] === 'true',
+        state: c.State,
+        running,
+        schedule: s0 ? { startTime: s0.startTime, stopTime: s0.stopTime, enabled: s0.enabled } : null,
       };
+      if (!running) return { ...base, cpuPct: 0, memBytes: 0, netInBps: 0, netOutBps: 0 };
       try {
         const s: any = await new Promise((res, rej) =>
           docker.getContainer(c.Id).stats({ stream: false }, (e: unknown, d: unknown) => (e ? rej(e) : res(d))),
@@ -56,7 +70,31 @@ export async function containerStats(): Promise<ContainerStat[]> {
       }
     }),
   );
-  return rows.sort((a, b) => b.memBytes - a.memBytes);
+  // em execução primeiro, depois por memória
+  return rows.sort((a, b) => Number(b.running) - Number(a.running) || b.memBytes - a.memBytes);
+}
+
+// Liga/desliga um container do host pelo nome.
+export async function startContainer(name: string) { await docker.getContainer(name).start(); }
+export async function stopContainer(name: string) { await docker.getContainer(name).stop(); }
+
+// ── Agendador (liga/desliga diário por horário local) ────────────────────
+let schedStarted = false;
+export function startScheduler() {
+  if (schedStarted) return;
+  schedStarted = true;
+  const tick = async () => {
+    try {
+      const d = new Date();
+      const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const all = await prisma.containerSchedule.findMany({ where: { enabled: true } });
+      for (const s of all) {
+        if (s.startTime === hhmm) await startContainer(s.containerName).catch(() => {});
+        if (s.stopTime === hhmm) await stopContainer(s.containerName).catch(() => {});
+      }
+    } catch { /* ignora ciclo */ }
+  };
+  setInterval(tick, 60_000);
 }
 
 // ── Eventos do Docker (buffer em memória) ────────────────────────────────
@@ -114,5 +152,6 @@ export async function storage(): Promise<StorageItem[]> {
   return [...volumes, ...containers].filter((x) => x.sizeBytes > 0).sort((a, b) => b.sizeBytes - a.sizeBytes);
 }
 
-// Começa a coletar eventos assim que o módulo carrega (boot da API).
+// Começa a coletar eventos e o agendador assim que o módulo carrega (boot da API).
 startDockerEvents();
+startScheduler();
