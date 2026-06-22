@@ -33,6 +33,24 @@ export default async function serviceRoutes(app: FastifyInstance) {
     };
   });
 
+  // Atualiza configuração do serviço (spec: source/repo/imagem/porta…) e nome.
+  // O spec é mesclado (merge raso) pra não perder campos não enviados.
+  app.patch('/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = z.object({
+      name: z.string().min(1).optional(),
+      spec: z.record(z.any()).optional(),
+    }).parse(req.body);
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const mergedSpec = body.spec ? { ...(s.spec as object), ...body.spec } : (s.spec as object);
+    const updated = await prisma.service.update({
+      where: { id },
+      data: { ...(body.name ? { name: body.name } : {}), spec: mergedSpec },
+    });
+    return updated;
+  });
+
   // ---- env vars ----
   app.post('/:id/env', async (req, reply) => {
     const { id } = req.params as { id: string };

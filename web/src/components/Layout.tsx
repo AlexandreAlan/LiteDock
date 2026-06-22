@@ -52,7 +52,7 @@ export function Layout() {
           <span className="text-xl">🐳</span>
           <div className="leading-tight">
             <div className="text-sm font-bold text-ink">LiteDock</div>
-            <div className="text-[11px] text-muted">v0.2.0</div>
+            <div className="text-[11px] text-muted">v0.6.0</div>
           </div>
         </div>
 
@@ -111,9 +111,9 @@ export function Layout() {
             <span>· {m?.cpu.cores ?? '—'} cores</span>
           </div>
           <div className="mb-3 flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-              <span className="text-xs font-medium text-brand-ink">Modo seguro</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-ok/30 bg-ok/10 px-2.5 py-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-ok" />
+              <span className="text-xs font-medium text-ok">Deploy ativo</span>
             </div>
             <button
               onClick={toggle}

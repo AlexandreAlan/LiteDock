@@ -80,6 +80,7 @@ npm run dev        # http://127.0.0.1:8088
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/services/:id` | detalhe (segredos mascarados) |
+| PATCH | `/services/:id` | atualiza config do serviço (spec: source/repo/imagem/porta) + nome |
 | POST | `/services/:id/env` | upsert de env var (cifrada AES-256-GCM) |
 | DELETE | `/services/:id/env/:key` | remove env var |
 | POST | `/services/:id/domains` | adiciona domínio (roteamento Traefik) |

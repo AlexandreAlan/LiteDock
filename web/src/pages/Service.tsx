@@ -1,66 +1,71 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type ServiceFull } from '../lib/api';
+import { api, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
 import { Card } from '../components/Card';
 import { StatusDot } from '../components/StatusDot';
-import { TypeBadge } from '../components/badges';
+import { TypeBadge, ServiceGlyph } from '../components/badges';
 import { Spinner, ErrorNote, Empty } from '../components/ui';
 
-function GuardBtn({ label, danger }: { label: string; danger?: boolean }) {
-  return (
-    <button
-      disabled
-      title="Modo seguro — ações de deploy desativadas"
-      className={`inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium opacity-60 ${
-        danger ? 'border-bad/40 text-bad' : 'border-line text-ink'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+const TERMINAL = ['success', 'failed'];
+const isInflight = (st?: string) => !!st && !TERMINAL.includes(st);
+
+// Abas no padrão do EasyPanel (Source · Environment · Domains · Deployments · Logs · Advanced).
+type Tab = 'source' | 'env' | 'domains' | 'deploys' | 'logs' | 'advanced';
 
 export function Service() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const svc = useQuery({ queryKey: ['service', id], queryFn: () => api.get<ServiceFull>(`/services/${id}`) });
-  const [showLogs, setShowLogs] = useState(false);
-  const logs = useQuery({
-    queryKey: ['service-logs', id],
-    queryFn: () => api.get<{ logs?: string } | string>(`/services/${id}/logs`),
-    enabled: showLogs,
-    retry: false,
-  });
+  const [tab, setTab] = useState<Tab>('source');
 
-  // env
-  const [ek, setEk] = useState('');
-  const [ev, setEv] = useState('');
-  const addEnv = useMutation({
-    mutationFn: () => api.post(`/services/${id}/env`, { key: ek, value: ev, isSecret: true }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', id] }); setEk(''); setEv(''); },
+  // ── deploy ao vivo (assíncrono + polling) ─────────────────────────────
+  const [activeDep, setActiveDep] = useState<string | null>(null);
+  const depQ = useQuery({
+    queryKey: ['deployment', id, activeDep],
+    queryFn: () => api.get<Deployment>(`/services/${id}/deployments/${activeDep}`),
+    enabled: !!activeDep,
+    refetchInterval: (q) => (isInflight((q.state.data as Deployment | undefined)?.status) ? 1500 : false),
   });
-  const delEnv = useMutation({
-    mutationFn: (key: string) => api.del(`/services/${id}/env/${encodeURIComponent(key)}`),
+  // Ao terminar um deploy, atualiza o serviço (status/containers).
+  useEffect(() => {
+    const st = depQ.data?.status;
+    if (st && TERMINAL.includes(st)) qc.invalidateQueries({ queryKey: ['service', id] });
+  }, [depQ.data?.status, id, qc]);
+  // Se já houver um deploy em andamento ao abrir a página, retoma o acompanhamento.
+  useEffect(() => {
+    const running = svc.data?.deployments?.find((d) => isInflight(d.status));
+    if (running && !activeDep) { setActiveDep(running.id); setTab('deploys'); }
+  }, [svc.data, activeDep]);
+
+  const deploy = useMutation({
+    mutationFn: () => api.post<DeployStart>(`/services/${id}/deploy`),
+    onSuccess: (r) => { setActiveDep(r.deploymentId); setTab('deploys'); },
+  });
+  const lifecycle = useMutation({
+    mutationFn: (action: 'start' | 'stop' | 'restart') => api.post(`/services/${id}/${action}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['service', id] }),
   });
-
-  // domains
-  const [host, setHost] = useState('');
-  const [port, setPort] = useState('3000');
-  const addDomain = useMutation({
-    mutationFn: () => api.post(`/services/${id}/domains`, { host, targetPort: Number(port), https: true }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', id] }); setHost(''); },
+  const destroy = useMutation({
+    mutationFn: () => api.del(`/services/${id}`),
+    onSuccess: () => navigate(svc.data?.project ? `/project/${svc.data.project.id}` : '/'),
   });
 
-  // source tabs (app)
-  const [srcTab, setSrcTab] = useState<'github' | 'docker'>('github');
-
-  if (svc.isLoading) return <Spinner label="loading service…" />;
+  if (svc.isLoading) return <Spinner label="carregando serviço…" />;
   if (svc.error) return <ErrorNote message={(svc.error as Error).message} />;
   const s = svc.data!;
   const isApp = s.type === 'app';
-  const logText = typeof logs.data === 'string' ? logs.data : logs.data?.logs;
+  const deploying = deploy.isPending || isInflight(depQ.data?.status);
+
+  const TABS: { key: Tab; label: string; show: boolean }[] = [
+    { key: 'source', label: 'Source', show: isApp },
+    { key: 'env', label: 'Environment', show: true },
+    { key: 'domains', label: 'Domains', show: true },
+    { key: 'deploys', label: 'Deployments', show: true },
+    { key: 'logs', label: 'Logs', show: true },
+    { key: 'advanced', label: 'Advanced', show: true },
+  ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -75,130 +80,324 @@ export function Service() {
 
       {/* header + ações */}
       <div className="card p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-ink">{s.name}</h1>
-          <TypeBadge type={s.type} spec={s.spec} />
-          <span className="ml-1"><StatusDot state={s.status} withLabel /></span>
+        <div className="flex flex-wrap items-center gap-3">
+          <ServiceGlyph type={s.type} name={s.name} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-xl font-semibold text-ink">{s.name}</h1>
+              <TypeBadge type={s.type} spec={s.spec} />
+            </div>
+            <div className="mt-0.5"><StatusDot state={deploying ? 'restarting' : s.status} withLabel /></div>
+          </div>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {isApp && (
+              <button
+                onClick={() => deploy.mutate()}
+                disabled={deploying}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright disabled:opacity-60"
+              >
+                {deploying ? <><Spin /> Implantando…</> : '🚀 Deploy'}
+              </button>
+            )}
+            {s.status === 'running' || s.status === 'online' ? (
+              <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm">↻ Restart</button>
+            ) : (
+              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending || !s.containerId} className="btn-ghost text-sm">▶ Start</button>
+            )}
+            {(s.status === 'running' || s.status === 'online') && (
+              <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm">⏸ Stop</button>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {isApp ? (
-            <>
-              <button disabled title="Modo seguro" className="cursor-not-allowed rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white opacity-60">Deploy</button>
-              <GuardBtn label="Force Rebuild" />
-              <button onClick={() => setShowLogs((v) => !v)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:bg-panel2">Logs</button>
-              <GuardBtn label="Console" />
-              <GuardBtn label="Destroy" danger />
-            </>
-          ) : (
-            <>
-              <GuardBtn label="Disable" />
-              <button onClick={() => setShowLogs((v) => !v)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:bg-panel2">Logs</button>
-              <GuardBtn label="Console" />
-              <GuardBtn label="Destroy" danger />
-            </>
-          )}
-        </div>
+        {lifecycle.error && <div className="mt-3"><ErrorNote message={(lifecycle.error as Error).message} /></div>}
+        {deploy.error && <div className="mt-3"><ErrorNote message={(deploy.error as Error).message} /></div>}
       </div>
 
-      {/* logs console */}
-      {showLogs && (
-        <Card title="Logs">
-          {logs.isLoading ? <Spinner /> : logText ? (
-            <pre className="max-h-80 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{logText}</pre>
-          ) : (
-            <Empty title="No logs" hint="This service hasn't produced output yet." />
+      {/* abas */}
+      <div className="flex gap-1 border-b border-line">
+        {TABS.filter((t) => t.show).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={[
+              '-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
+              tab === t.key ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink',
+            ].join(' ')}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'source' && isApp && <SourceTab s={s} />}
+      {tab === 'env' && <EnvTab s={s} />}
+      {tab === 'domains' && <DomainsTab s={s} />}
+      {tab === 'deploys' && <DeploysTab s={s} live={depQ.data} onRedeploy={() => deploy.mutate()} deploying={deploying} />}
+      {tab === 'logs' && <LogsTab id={id} />}
+      {tab === 'advanced' && <AdvancedTab s={s} onDestroy={() => destroy.mutate()} destroying={destroy.isPending} />}
+    </div>
+  );
+}
+
+function Spin() {
+  return <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />;
+}
+
+// ── Source (origem/build) ───────────────────────────────────────────────
+function SourceTab({ s }: { s: ServiceFull }) {
+  const qc = useQueryClient();
+  const spec = (s.spec ?? {}) as Record<string, unknown>;
+  const initialSource = (spec.source as string) || (spec.repo ? 'git' : 'image');
+  const [source, setSource] = useState<'git' | 'image'>(initialSource === 'git' ? 'git' : 'image');
+  const [repo, setRepo] = useState((spec.repo as string) || '');
+  const [branch, setBranch] = useState((spec.branch as string) || 'main');
+  const [subdir, setSubdir] = useState((spec.subdir as string) || '');
+  const [dockerfile, setDockerfile] = useState((spec.dockerfile as string) || '');
+  const [image, setImage] = useState((spec.image as string) || '');
+  const [port, setPort] = useState(String(spec.port || 3000));
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.patch(`/services/${s.id}`, {
+        spec:
+          source === 'git'
+            ? { source: 'git', repo, branch, subdir: subdir || undefined, dockerfile: dockerfile || undefined, port: Number(port), image: undefined }
+            : { source: 'image', image, port: Number(port), repo: undefined },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+  });
+
+  return (
+    <Card title="Source" subtitle="De onde o LiteDock constrói e implanta este app.">
+      <div className="mb-4 inline-flex rounded-lg border border-line p-1">
+        {(['git', 'image'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setSource(t)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${source === t ? 'bg-panel2 text-ink' : 'text-muted hover:text-ink'}`}
+          >
+            {t === 'git' ? 'Repositório Git' : 'Imagem Docker'}
+          </button>
+        ))}
+      </div>
+
+      {source === 'git' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2"><label className="label mb-1 block">Repositório (URL Git)</label><input className="field" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/voce/app.git" /></div>
+          <div><label className="label mb-1 block">Branch</label><input className="field" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" /></div>
+          <div><label className="label mb-1 block">Build Path (subpasta)</label><input className="field" value={subdir} onChange={(e) => setSubdir(e.target.value)} placeholder="/ (raiz)" /></div>
+          <div className="sm:col-span-2"><label className="label mb-1 block">Dockerfile (opcional)</label><input className="field" value={dockerfile} onChange={(e) => setDockerfile(e.target.value)} placeholder="Dockerfile — vazio = Nixpacks detecta a stack" /></div>
+          <p className="sm:col-span-2 text-xs text-muted">Com Dockerfile → <code className="text-ink">docker build</code>. Sem Dockerfile → <code className="text-ink">Nixpacks</code> (buildpack, detecta Node/Python/Go/PHP… sozinho).</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2"><label className="label mb-1 block">Imagem Docker</label><input className="field" value={image} onChange={(e) => setImage(e.target.value)} placeholder="nginx:latest" /></div>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div><label className="label mb-1 block">Porta interna (proxy)</label><input className="field" value={port} onChange={(e) => setPort(e.target.value)} placeholder="3000" /></div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button className="btn-brand text-sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando…' : 'Salvar'}</button>
+        {save.isSuccess && <span className="text-xs text-ok">Salvo ✓</span>}
+        {save.error && <ErrorNote message={(save.error as Error).message} />}
+      </div>
+    </Card>
+  );
+}
+
+// ── Environment ─────────────────────────────────────────────────────────
+function EnvTab({ s }: { s: ServiceFull }) {
+  const qc = useQueryClient();
+  const [k, setK] = useState('');
+  const [v, setV] = useState('');
+  const add = useMutation({
+    mutationFn: () => api.post(`/services/${s.id}/env`, { key: k, value: v, isSecret: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setK(''); setV(''); },
+  });
+  const del = useMutation({
+    mutationFn: (key: string) => api.del(`/services/${s.id}/env/${encodeURIComponent(key)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+  });
+  return (
+    <Card title="Environment" subtitle="Variáveis de ambiente (segredos cifrados AES-256-GCM em repouso).">
+      {s.envVars && s.envVars.length > 0 ? (
+        <ul className="mb-4 divide-y divide-line">
+          {s.envVars.map((e) => (
+            <li key={e.key} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <span className="font-mono font-medium text-ink">{e.key}</span>
+              <span className="flex items-center gap-3">
+                <span className="font-mono text-muted">{e.value}</span>
+                <button onClick={() => del.mutate(e.key)} className="text-bad hover:underline">remover</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-4 text-sm text-muted">Nenhuma variável ainda.</p>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex-1"><label className="label mb-1 block">Chave</label><input className="field font-mono" value={k} onChange={(e) => setK(e.target.value)} placeholder="DATABASE_URL" /></div>
+        <div className="flex-1"><label className="label mb-1 block">Valor</label><input className="field font-mono" value={v} onChange={(e) => setV(e.target.value)} placeholder="postgres://…" /></div>
+        <button className="btn-brand text-sm" disabled={!k || add.isPending} onClick={() => add.mutate()}>{add.isPending ? 'Salvando…' : 'Adicionar'}</button>
+      </div>
+    </Card>
+  );
+}
+
+// ── Domains & Proxy ─────────────────────────────────────────────────────
+function DomainsTab({ s }: { s: ServiceFull }) {
+  const qc = useQueryClient();
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState('3000');
+  const add = useMutation({
+    mutationFn: () => api.post(`/services/${s.id}/domains`, { host, targetPort: Number(port), https: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setHost(''); },
+  });
+  const del = useMutation({
+    mutationFn: (domainId: string) => api.del(`/services/${s.id}/domains/${domainId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+  });
+  return (
+    <Card title="Domains & Proxy" subtitle="Domínios roteados pelo Traefik com HTTPS (Let's Encrypt) automático.">
+      {s.domains && s.domains.length > 0 ? (
+        <ul className="mb-4 divide-y divide-line">
+          {s.domains.map((d) => (
+            <li key={d.id} className="flex items-center justify-between py-2 text-sm">
+              <a href={`${d.https ? 'https' : 'http'}://${d.host}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">{d.https ? 'https://' : 'http://'}{d.host}</a>
+              <span className="flex items-center gap-3 text-xs text-muted">
+                <span>:{d.targetPort}</span>
+                <span className="rounded bg-panel2 px-2 py-0.5">{d.certStatus}</span>
+                <button onClick={() => del.mutate(d.id)} className="text-bad hover:underline">remover</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-4 text-sm text-muted">Nenhum domínio ainda.</p>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex-1"><label className="label mb-1 block">Domínio</label><input className="field" value={host} onChange={(e) => setHost(e.target.value)} placeholder="app.seudominio.com" /></div>
+        <div className="w-28"><label className="label mb-1 block">Porta</label><input className="field" value={port} onChange={(e) => setPort(e.target.value)} /></div>
+        <button className="btn-brand text-sm" disabled={!host || add.isPending} onClick={() => add.mutate()}>{add.isPending ? 'Adicionando…' : 'Adicionar'}</button>
+      </div>
+      {add.error && <div className="mt-3"><ErrorNote message={(add.error as Error).message} /></div>}
+    </Card>
+  );
+}
+
+// ── Deployments (com deploy ao vivo) ────────────────────────────────────
+function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?: Deployment; onRedeploy: () => void; deploying: boolean }) {
+  const statusColor = (st: string) =>
+    st === 'success' ? 'text-ok' : st === 'failed' ? 'text-bad' : 'text-warn';
+  return (
+    <div className="space-y-5">
+      {live && (
+        <Card title="Implantação atual">
+          <div className="mb-2 flex items-center gap-2 text-sm">
+            <span className={`font-medium ${statusColor(live.status)}`}>{live.status}</span>
+            {isInflight(live.status) && <Spinner label="" />}
+          </div>
+          {live.log && (
+            <pre className="max-h-96 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{live.log}</pre>
           )}
         </Card>
       )}
-
-      {/* Source (app) */}
-      {isApp && (
-        <Card title="Source">
-          <div className="mb-4 inline-flex rounded-lg border border-line p-1">
-            {(['github', 'docker'] as const).map((t) => (
-              <button key={t} onClick={() => setSrcTab(t)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${srcTab === t ? 'bg-panel2 text-ink' : 'text-muted hover:text-ink'}`}>
-                {t === 'github' ? 'Github' : 'Docker Image'}
-              </button>
-            ))}
-          </div>
-          {srcTab === 'github' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="label mb-1 block">Owner</label><input className="field" placeholder="owner" /></div>
-              <div><label className="label mb-1 block">Repository</label><input className="field" placeholder="repo" /></div>
-              <div><label className="label mb-1 block">Branch</label><input className="field" defaultValue="main" /></div>
-              <div><label className="label mb-1 block">Build Path</label><input className="field" defaultValue="/" /></div>
-            </div>
-          ) : (
-            <div><label className="label mb-1 block">Image</label><input className="field" placeholder="nginx:latest" /></div>
-          )}
-          <div className="mt-4">
-            <button disabled title="Modo seguro" className="cursor-not-allowed rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white opacity-60">Save</button>
-          </div>
-        </Card>
-      )}
-
-      {/* Environment */}
-      <Card title="Environment">
-        {s.envVars && s.envVars.length > 0 ? (
-          <ul className="mb-4 divide-y divide-line">
-            {s.envVars.map((e) => (
-              <li key={e.key} className="flex items-center justify-between gap-2 py-2 text-sm">
-                <span className="font-medium text-ink">{e.key}</span>
-                <span className="flex items-center gap-3">
-                  <span className="text-muted">{e.value}</span>
-                  <button onClick={() => delEnv.mutate(e.key)} className="text-bad hover:underline">remove</button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mb-4 text-sm text-muted">No environment variables yet.</p>
-        )}
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex-1"><label className="label mb-1 block">Key</label><input className="field" value={ek} onChange={(e) => setEk(e.target.value)} placeholder="DATABASE_URL" /></div>
-          <div className="flex-1"><label className="label mb-1 block">Value</label><input className="field" value={ev} onChange={(e) => setEv(e.target.value)} placeholder="postgres://…" /></div>
-          <button className="btn-brand" disabled={!ek || addEnv.isPending} onClick={() => addEnv.mutate()}>{addEnv.isPending ? 'Saving…' : 'Add'}</button>
+      <Card title="Deployments" subtitle="Histórico de implantações (manual, webhook ou API).">
+        <div className="mb-3">
+          <button onClick={onRedeploy} disabled={deploying} className="btn-ghost text-sm">{deploying ? 'Implantando…' : '↻ Reimplantar'}</button>
         </div>
-      </Card>
-
-      {/* Domains */}
-      <Card title="Domains">
-        {s.domains && s.domains.length > 0 ? (
-          <ul className="mb-4 divide-y divide-line">
-            {s.domains.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-ink">{d.https ? 'https://' : 'http://'}{d.host}</span>
-                <span className="text-xs text-muted">:{d.targetPort} · {d.certStatus}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mb-4 text-sm text-muted">No domains yet.</p>
-        )}
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex-1"><label className="label mb-1 block">Host</label><input className="field" value={host} onChange={(e) => setHost(e.target.value)} placeholder="app.seudominio.com" /></div>
-          <div className="w-28"><label className="label mb-1 block">Port</label><input className="field" value={port} onChange={(e) => setPort(e.target.value)} /></div>
-          <button className="btn-brand" disabled={!host || addDomain.isPending} onClick={() => addDomain.mutate()}>{addDomain.isPending ? 'Adding…' : 'Add'}</button>
-        </div>
-      </Card>
-
-      {/* Deployments */}
-      <Card title="Deployments">
         {s.deployments && s.deployments.length > 0 ? (
           <ul className="divide-y divide-line">
             {s.deployments.map((d) => (
               <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-ink">{d.trigger}</span>
+                <span className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${d.status === 'success' ? 'bg-ok' : d.status === 'failed' ? 'bg-bad' : 'bg-warn'}`} />
+                  <span className="text-ink">{d.trigger}</span>
+                  {d.imageTag && <span className="font-mono text-xs text-muted">{d.imageTag}</span>}
+                </span>
                 <span className="flex items-center gap-3 text-xs text-muted">
                   <span>{new Date(d.startedAt).toLocaleString('pt-BR')}</span>
-                  <span className="rounded bg-panel2 px-2 py-0.5">{d.status}</span>
+                  <span className={`rounded bg-panel2 px-2 py-0.5 ${statusColor(d.status)}`}>{d.status}</span>
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted">No deployments yet.</p>
+          <Empty title="Sem implantações" hint="Configure a origem na aba Source e clique em Deploy." />
         )}
+      </Card>
+    </div>
+  );
+}
+
+// ── Logs ────────────────────────────────────────────────────────────────
+function LogsTab({ id }: { id: string }) {
+  const [auto, setAuto] = useState(true);
+  const logs = useQuery({
+    queryKey: ['service-logs', id],
+    queryFn: () => api.get<{ logs?: string } | string>(`/services/${id}/logs?tail=400`),
+    refetchInterval: auto ? 3000 : false,
+    retry: false,
+  });
+  const text = typeof logs.data === 'string' ? logs.data : logs.data?.logs;
+  return (
+    <Card title="Logs" subtitle="Saída do container (stdout/stderr).">
+      <div className="mb-3 flex items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-muted">
+          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> auto-atualizar (3s)
+        </label>
+        <button onClick={() => logs.refetch()} className="btn-ghost text-xs">Atualizar agora</button>
+      </div>
+      {logs.isLoading ? <Spinner /> : logs.error ? <ErrorNote message={(logs.error as Error).message} /> : text ? (
+        <pre className="max-h-[28rem] overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{text}</pre>
+      ) : (
+        <Empty title="Sem logs" hint="Este serviço ainda não produziu saída." />
+      )}
+    </Card>
+  );
+}
+
+// ── Advanced (webhook + danger zone) ────────────────────────────────────
+function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: () => void; destroying: boolean }) {
+  const [webhook, setWebhook] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState('');
+  const gen = useMutation({
+    mutationFn: () => api.post<WebhookInfo>(`/services/${s.id}/webhook`),
+    onSuccess: (r) => setWebhook(r.url),
+  });
+  return (
+    <div className="space-y-5">
+      <Card title="Deploy Webhook" subtitle="Cole no GitHub/GitLab — cada push dispara um deploy automático (CI/CD).">
+        <button className="btn-brand text-sm" disabled={gen.isPending} onClick={() => gen.mutate()}>{gen.isPending ? 'Gerando…' : webhook ? 'Gerar nova URL' : 'Gerar URL do webhook'}</button>
+        {webhook && (
+          <div className="mt-3">
+            <div className="flex items-center gap-2">
+              <input readOnly value={webhook} className="field font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+              <button className="btn-ghost text-xs" onClick={() => navigator.clipboard?.writeText(webhook)}>Copiar</button>
+            </div>
+            <p className="mt-2 text-xs text-muted">Método <code className="text-ink">POST</code>. Gerar uma nova URL invalida a anterior.</p>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Zona de perigo">
+        <p className="mb-3 text-sm text-muted">Remover o serviço apaga o container e todo o registro. Não tem volta.</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1">
+            <label className="label mb-1 block">Digite <span className="font-mono text-ink">{s.name}</span> para confirmar</label>
+            <input className="field" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={s.name} />
+          </div>
+          <button
+            onClick={onDestroy}
+            disabled={confirm !== s.name || destroying}
+            className="inline-flex items-center gap-2 rounded-lg border border-bad/50 px-4 py-2 text-sm font-medium text-bad transition-colors hover:bg-bad/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {destroying ? 'Removendo…' : '🗑 Remover serviço'}
+          </button>
+        </div>
       </Card>
     </div>
   );

@@ -57,6 +57,7 @@ export const api = {
   get: <T>(p: string) => request<T>('GET', p),
   post: <T>(p: string, b?: unknown) => request<T>('POST', p, b),
   put: <T>(p: string, b?: unknown) => request<T>('PUT', p, b),
+  patch: <T>(p: string, b?: unknown) => request<T>('PATCH', p, b),
   del: <T>(p: string) => request<T>('DELETE', p),
 };
 
@@ -100,11 +101,20 @@ export interface Domain {
 }
 export interface Deployment {
   id: string;
-  status: string;
-  trigger: string;
+  status: string; // queued|building|deploying|success|failed
+  trigger: string; // manual|webhook|api
   imageTag?: string | null;
+  log?: string | null;
   startedAt: string;
   finishedAt?: string | null;
+}
+export interface DeployStart {
+  deploymentId: string;
+  status: string;
+  alreadyRunning?: boolean;
+}
+export interface WebhookInfo {
+  url: string;
 }
 export interface ServiceFull extends Service {
   project?: Project;
