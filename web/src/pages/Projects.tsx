@@ -5,6 +5,7 @@ import { api, type Project, type Service } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { MetricsBar } from '../components/MetricsBar';
 import { StatusDot } from '../components/StatusDot';
+import { Icon } from '../components/icons';
 import { Spinner, Empty } from '../components/ui';
 
 // Rótulo de tipo sob o nome do serviço (app / postgres / redis / compose…).
@@ -49,7 +50,7 @@ export function Projects() {
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <h2 className="text-xl font-semibold text-ink">Projetos</h2>
         <div className="ml-auto flex items-center gap-2">
-          <button className="btn-brand text-sm" onClick={() => setOpen(true)}>+ Novo</button>
+          <button className="btn-brand text-sm" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Novo</button>
           <Segmented
             value={sort}
             onChange={(v) => setSort(v as Sort)}
@@ -81,9 +82,10 @@ export function Projects() {
               <div className="flex items-center gap-2">
                 <Link to={`/project/${p.id}`} className="text-base font-semibold text-ink hover:underline">{p.name}</Link>
                 <div className="flex items-center gap-0.5 text-muted">
-                  <Link to={`/project/${p.id}`} title="Abrir projeto" className="rounded p-1 text-sm hover:bg-panel2 hover:text-ink">📂</Link>
-                  <Link to={`/project/${p.id}`} title="Configurar" className="rounded p-1 text-sm hover:bg-panel2 hover:text-ink">⚙️</Link>
-                  <Link to={`/project/${p.id}`} title="Adicionar serviço" className="rounded p-1 text-sm hover:bg-panel2 hover:text-ink">＋</Link>
+                  <Link to={`/project/${p.id}`} title="Abrir projeto" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="folder" className="h-4 w-4" /></Link>
+                  <Link to={`/project/${p.id}`} title="Configurar" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="settings" className="h-4 w-4" /></Link>
+                  <Link to={`/project/${p.id}`} title="Adicionar serviço" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="plus" className="h-4 w-4" /></Link>
+                  <Link to={`/project/${p.id}`} title="Layout" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="layout" className="h-4 w-4" /></Link>
                 </div>
                 <span className="ml-1 text-xs text-muted">{p.services?.length ?? 0} serviços</span>
               </div>

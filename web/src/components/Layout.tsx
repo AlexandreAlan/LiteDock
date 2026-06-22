@@ -5,19 +5,20 @@ import { api, type HostMetrics } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { CommandPalette } from './CommandPalette';
+import { Icon } from './icons';
 
 const NAV = [
-  { to: '/', label: 'Projects', end: true, icon: '▦' },
-  { to: '/monitor', label: 'Monitor', icon: '📈' },
-  { to: '/domains', label: 'Domínios', icon: '🌐' },
-  { to: '/settings', label: 'Ajustes', icon: '⚙️' },
+  { to: '/', label: 'Projects', end: true, icon: 'grid' as const },
+  { to: '/monitor', label: 'Monitor', icon: 'activity' as const },
+  { to: '/domains', label: 'Domínios', icon: 'globe' as const },
+  { to: '/settings', label: 'Ajustes', icon: 'settings' as const },
 ];
 
 const LINKS = [
-  { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true },
-  { label: 'Discord', href: 'https://discord.com', ext: true },
-  { label: 'Comentários', href: '#', ext: false },
-  { label: 'Registro de alterações', href: '#', ext: false },
+  { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true, icon: 'book' as const },
+  { label: 'Discord', href: 'https://discord.com', ext: true, icon: 'message' as const },
+  { label: 'Comentários', href: '#', ext: false, icon: 'message' as const },
+  { label: 'Registro de alterações', href: '#', ext: false, icon: 'history' as const },
 ];
 
 export function Layout() {
@@ -49,7 +50,9 @@ export function Layout() {
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <span className="text-xl">🐳</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
+            <Icon name="cube" className="h-[18px] w-[18px]" />
+          </span>
           <div className="leading-tight">
             <div className="text-sm font-bold text-ink">LiteDock</div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted">
@@ -66,7 +69,7 @@ export function Layout() {
             className="flex w-full items-center justify-between rounded-lg border border-line bg-panel2 px-3 py-2 text-sm text-muted transition-colors hover:border-brand/40"
           >
             <span className="flex items-center gap-2">
-              <span className="text-muted">⌕</span> Busca rápida
+              <Icon name="search" className="h-4 w-4" /> Busca rápida
             </span>
             <kbd className="rounded border border-line bg-panel px-1.5 text-[11px]">⌘K</kbd>
           </button>
@@ -85,7 +88,7 @@ export function Layout() {
                 ].join(' ')
               }
             >
-              <span className="text-base leading-none opacity-80">{n.icon}</span>
+              <Icon name={n.icon} className="h-[18px] w-[18px]" />
               {n.label}
             </NavLink>
           ))}
@@ -100,8 +103,9 @@ export function Layout() {
               href={l.href}
               target={l.ext ? '_blank' : undefined}
               rel={l.ext ? 'noreferrer' : undefined}
-              className="rounded-lg px-3 py-1.5 text-sm text-muted transition-colors hover:bg-panel2 hover:text-ink"
+              className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-muted transition-colors hover:bg-panel2 hover:text-ink"
             >
+              <Icon name={l.icon} className="h-4 w-4" />
               {l.label}
             </a>
           ))}
@@ -121,9 +125,9 @@ export function Layout() {
             <button
               onClick={toggle}
               title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-              className="ml-auto rounded-lg border border-line px-2 py-1 text-sm text-ink transition-colors hover:bg-panel2"
+              className="ml-auto rounded-lg border border-line p-1.5 text-ink transition-colors hover:bg-panel2"
             >
-              {theme === 'dark' ? '☀️' : '🌙'}
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} className="h-4 w-4" />
             </button>
           </div>
           <div className="flex items-center justify-between">
@@ -144,7 +148,7 @@ export function Layout() {
             rel="noreferrer"
             className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright"
           >
-            <span>⟳</span> Atualização disponível
+            <Icon name="refresh" className="h-4 w-4" /> Atualização disponível
           </a>
         </div>
       </aside>

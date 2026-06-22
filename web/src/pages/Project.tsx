@@ -6,7 +6,8 @@ import { Modal } from '../components/Modal';
 import { TemplateCatalog } from '../components/TemplateCatalog';
 import { Spinner, Empty, ErrorNote } from '../components/ui';
 import { StatusDot } from '../components/StatusDot';
-import { TypeBadge, ServiceGlyph } from '../components/badges';
+import { TypeBadge } from '../components/badges';
+import { Icon } from '../components/icons';
 
 const DB_ENGINES = ['postgres', 'mysql', 'mongo', 'redis'];
 
@@ -58,8 +59,8 @@ export function Project() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
         <div className="flex items-center gap-2">
-          <button className="btn-ghost" onClick={() => setStore(true)}>⚡ Templates</button>
-          <button className="btn-brand" onClick={() => setOpen(true)}>+ Criar serviço</button>
+          <button className="btn-ghost" onClick={() => setStore(true)}><Icon name="zap" className="h-4 w-4" /> Templates</button>
+          <button className="btn-brand" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Criar serviço</button>
         </div>
       </div>
 
@@ -69,8 +70,8 @@ export function Project() {
           hint="Instale um app pronto pela loja de Templates ou crie um serviço do zero."
           action={
             <div className="flex items-center gap-2">
-              <button className="btn-brand" onClick={() => setStore(true)}>⚡ Ver Templates</button>
-              <button className="btn-ghost" onClick={() => setOpen(true)}>+ Criar serviço</button>
+              <button className="btn-brand" onClick={() => setStore(true)}><Icon name="zap" className="h-4 w-4" /> Ver Templates</button>
+              <button className="btn-ghost" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Criar serviço</button>
             </div>
           }
         />
@@ -78,7 +79,6 @@ export function Project() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((s) => (
             <Link key={s.id} to={`/service/${s.id}`} className="card flex items-center gap-3 p-4 transition-shadow hover:shadow-pop">
-              <ServiceGlyph type={s.type} name={s.name} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium text-ink">{s.name}</span>

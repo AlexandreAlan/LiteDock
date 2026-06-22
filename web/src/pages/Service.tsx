@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
 import { Card } from '../components/Card';
 import { StatusDot } from '../components/StatusDot';
-import { TypeBadge, ServiceGlyph } from '../components/badges';
+import { TypeBadge } from '../components/badges';
+import { Icon } from '../components/icons';
 import { Spinner, ErrorNote, Empty } from '../components/ui';
 
 const TERMINAL = ['success', 'failed'];
@@ -81,7 +82,9 @@ export function Service() {
       {/* header + ações */}
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <ServiceGlyph type={s.type} name={s.name} />
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand/10 text-brand-ink">
+            <Icon name="cube" className="h-5 w-5" />
+          </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-xl font-semibold text-ink">{s.name}</h1>
@@ -96,16 +99,16 @@ export function Service() {
                 disabled={deploying}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright disabled:opacity-60"
               >
-                {deploying ? <><Spin /> Implantando…</> : '🚀 Deploy'}
+                {deploying ? <><Spin /> Implantando…</> : <><Icon name="rocket" className="h-4 w-4" /> Deploy</>}
               </button>
             )}
             {s.status === 'running' || s.status === 'online' ? (
-              <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm">↻ Restart</button>
+              <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="rotate" className="h-4 w-4" /> Restart</button>
             ) : (
-              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending || !s.containerId} className="btn-ghost text-sm">▶ Start</button>
+              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending || !s.containerId} className="btn-ghost text-sm"><Icon name="play" className="h-4 w-4" /> Start</button>
             )}
             {(s.status === 'running' || s.status === 'online') && (
-              <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm">⏸ Stop</button>
+              <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="pause" className="h-4 w-4" /> Stop</button>
             )}
           </div>
         </div>
@@ -307,7 +310,7 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
       )}
       <Card title="Deployments" subtitle="Histórico de implantações (manual, webhook ou API).">
         <div className="mb-3">
-          <button onClick={onRedeploy} disabled={deploying} className="btn-ghost text-sm">{deploying ? 'Implantando…' : '↻ Reimplantar'}</button>
+          <button onClick={onRedeploy} disabled={deploying} className="btn-ghost text-sm">{deploying ? 'Implantando…' : <><Icon name="rotate" className="h-4 w-4" /> Reimplantar</>}</button>
         </div>
         {s.deployments && s.deployments.length > 0 ? (
           <ul className="divide-y divide-line">
@@ -395,7 +398,7 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
             disabled={confirm !== s.name || destroying}
             className="inline-flex items-center gap-2 rounded-lg border border-bad/50 px-4 py-2 text-sm font-medium text-bad transition-colors hover:bg-bad/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {destroying ? 'Removendo…' : '🗑 Remover serviço'}
+            {destroying ? 'Removendo…' : <><Icon name="trash" className="h-4 w-4" /> Remover serviço</>}
           </button>
         </div>
       </Card>
