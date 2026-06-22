@@ -52,7 +52,10 @@ export function Layout() {
           <span className="text-xl">🐳</span>
           <div className="leading-tight">
             <div className="text-sm font-bold text-ink">LiteDock</div>
-            <div className="text-[11px] text-muted">v0.6.0</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted">
+              <span>v0.6.0</span>
+              <span className="rounded border border-line px-1 text-[10px] leading-tight">PT-BR</span>
+            </div>
           </div>
         </div>
 
@@ -78,7 +81,7 @@ export function Layout() {
               className={({ isActive }) =>
                 [
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive ? 'bg-brand/10 text-brand' : 'text-ink/70 hover:bg-panel2 hover:text-ink',
+                  isActive ? 'bg-panel2 text-ink' : 'text-ink/70 hover:bg-panel2 hover:text-ink',
                 ].join(' ')
               }
             >
@@ -135,6 +138,14 @@ export function Layout() {
               Sair
             </button>
           </div>
+          <a
+            href="https://github.com/AlexandreAlan/LiteDock/releases"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright"
+          >
+            <span>⟳</span> Atualização disponível
+          </a>
         </div>
       </aside>
 
