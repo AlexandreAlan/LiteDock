@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { listContainers, engineInfo } from '../services/docker.js';
+import { hostMetrics } from '../services/metrics.js';
 
 export default async function serverRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate);
@@ -9,4 +10,7 @@ export default async function serverRoutes(app: FastifyInstance) {
 
   // Visao da VPS: containers do host.
   app.get('/local/containers', async () => listContainers());
+
+  // Métricas do host: CPU / memória / disco / rede (estilo EasyPanel).
+  app.get('/local/metrics', async () => hostMetrics());
 }

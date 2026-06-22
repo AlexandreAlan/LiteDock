@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import serviceRoutes from './routes/services.js';
 import serverRoutes from './routes/servers.js';
+import domainRoutes from './routes/domains.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -43,6 +44,7 @@ await app.register(authRoutes, { prefix: '/auth' });
 await app.register(projectRoutes, { prefix: '/projects' });
 await app.register(serviceRoutes, { prefix: '/services' });
 await app.register(serverRoutes, { prefix: '/servers' });
+await app.register(domainRoutes, { prefix: '/domains' });
 
 const start = async () => {
   try {

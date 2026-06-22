@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project } from '../lib/api';
 import { Modal } from '../components/Modal';
+import { MetricsBar } from '../components/MetricsBar';
 import { Spinner, Empty, ErrorNote } from '../components/ui';
 
 export function Projects() {
@@ -27,8 +28,15 @@ export function Projects() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Projects</h1>
+      <div>
+        <h1 className="text-2xl font-semibold text-ink">Início</h1>
+        <p className="label mt-1">Visão geral do servidor</p>
+      </div>
+
+      <MetricsBar />
+
+      <div className="flex items-center justify-between pt-2">
+        <h2 className="text-lg font-semibold text-ink">Projects</h2>
         <button className="btn-brand" onClick={() => setOpen(true)}>
           Create
         </button>

@@ -131,3 +131,19 @@ export interface HostContainer {
   status: string;
   managed?: boolean;
 }
+export interface HostMetrics {
+  hostname: string;
+  uptimeSec: number;
+  cpu: { pct: number; cores: number; load: number[] };
+  memory: { usedBytes: number; totalBytes: number; pct: number };
+  disk: { usedBytes: number; totalBytes: number; pct: number };
+  network: { inBps: number; outBps: number };
+}
+export interface DomainFull {
+  id: string;
+  host: string;
+  targetPort: number;
+  https: boolean;
+  certStatus: string;
+  service?: { id: string; name: string; project?: { id: string; name: string } };
+}
