@@ -10,6 +10,7 @@ import serviceRoutes from './routes/services.js';
 import serverRoutes from './routes/servers.js';
 import domainRoutes from './routes/domains.js';
 import templateRoutes from './routes/templates.js';
+import webhookRoutes from './routes/webhooks.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -36,10 +37,11 @@ app.setErrorHandler((err, _req, reply) => {
     return reply.code(400).send({ error: 'dados invalidos', issues: err.issues });
   }
   app.log.error(err);
-  return reply.code(err.statusCode ?? 500).send({ error: err.message });
+  const e = err as { statusCode?: number; message?: string };
+  return reply.code(e.statusCode ?? 500).send({ error: e.message ?? 'erro interno' });
 });
 
-app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.2.0' }));
+app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.6.0' }));
 
 await app.register(authRoutes, { prefix: '/auth' });
 await app.register(projectRoutes, { prefix: '/projects' });
@@ -47,6 +49,8 @@ await app.register(serviceRoutes, { prefix: '/services' });
 await app.register(serverRoutes, { prefix: '/servers' });
 await app.register(domainRoutes, { prefix: '/domains' });
 await app.register(templateRoutes, { prefix: '/templates' });
+// Webhooks de CI/CD: público (autenticado por token do serviço), sem JWT.
+await app.register(webhookRoutes, { prefix: '/webhooks' });
 
 const start = async () => {
   try {

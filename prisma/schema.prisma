@@ -55,6 +55,7 @@ model Service {
   type        String // 'app' | 'database'
   status      String       @default("created") // created|deploying|running|stopped|error
   containerId String?
+  deployToken String?      @unique // token do webhook de deploy (CI/CD on-push)
   spec        Json         @default("{}")
   createdAt   DateTime     @default(now())
   envVars     EnvVar[]

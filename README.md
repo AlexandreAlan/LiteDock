@@ -84,8 +84,11 @@ npm run dev        # http://127.0.0.1:8088
 | DELETE | `/services/:id/env/:key` | remove env var |
 | POST | `/services/:id/domains` | adiciona domínio (roteamento Traefik) |
 | DELETE | `/services/:id/domains/:domainId` | remove domínio |
-| POST | `/services/:id/deploy` | **deploy real** (pull imagem → container → Traefik) |
-| POST | `/services/:id/start\|stop\|restart` | ciclo de vida |
+| POST | `/services/:id/deploy` | **deploy assíncrono**: enfileira (lock por serviço) e responde `202 {deploymentId}` na hora; troca **blue-green** com healthcheck |
+| GET | `/services/:id/deployments/:depId` | status do deployment (polling durante o deploy) |
+| POST | `/services/:id/webhook` | gera/rotaciona o token e devolve a URL do webhook de CI/CD |
+| POST | `/webhooks/services/:id/deploy?token=` | **público** (sem JWT): push do Git → deploy on-push |
+| POST | `/services/:id/start\|stop\|restart` | ciclo de vida (serializado com o deploy) |
 | DELETE | `/services/:id` | remove serviço (container + registro) |
 | GET | `/services/:id/logs?tail=N` | logs do container |
 | GET | `/services/:id/stats` | métricas CPU/memória |
@@ -127,7 +130,9 @@ SAFE_MODE=true uvicorn main:app --host 127.0.0.1 --port 8089
 
 - **Fase 0** — Fundação: scaffold, auth, Postgres/Redis, camada Docker ✅
 - **Fase 1** — Deploy de imagem + domínio (Traefik) + env cifrada + logs/métricas + ciclo de vida ✅
-- **Fase 2** — Build de código (Git + Nixpacks + webhooks CI/CD)
+- **Fase 2** — Build de código (Git + Nixpacks + webhooks CI/CD) ✅ clone do
+  repo, build por **Dockerfile** ou **Nixpacks** e **webhook on-push**
+  (⚠️ requer o binário `nixpacks` instalado no host para repos sem Dockerfile)
 - **Fase 3** — Bancos de dados 1-clique + backups
 - **Fase 4** — Observabilidade (logs, métricas, terminal web)
 - **Fase 5** — App Store (loja de templates 1-clique) 🚧 catálogo + instalação ✅; deploy real via worker Python (modo seguro)
@@ -135,6 +140,19 @@ SAFE_MODE=true uvicorn main:app --host 127.0.0.1 --port 8089
 
 ## Histórico de versões
 
+- **v0.6** — Fase 2: **deploy de código**. Clona o repositório Git e gera a
+  imagem por **Dockerfile** (`docker build`) ou **Nixpacks** (buildpack, sem
+  Dockerfile) — depois entra no mesmo fluxo blue-green do deploy por imagem.
+  Repo privado via `Credential` (token cifrado). **Webhook de CI/CD** (rota
+  pública autenticada por token único do serviço, comparação em tempo
+  constante): push no Git → deploy on-push.
+- **v0.5** — Robustez da automação de deploy: deploy **assíncrono** (responde
+  `202 {deploymentId}`, frontend faz polling — sem mais timeout no pull),
+  **lock por serviço** (fila in-process — fim das corridas de duplo-clique;
+  estado durável fica no Postgres) e troca **blue-green com healthcheck**
+  (sobe a nova versão, valida saúde e só então aponta o tráfego; deploy ruim
+  **não derruba** o serviço — rollback automático). `start/stop/restart/delete`
+  passam a serializar pelo mesmo lock.
 - **v0.4** — Loja de templates estilo EasyPanel (22 apps, instalação 1-clique cria
   serviços + envs/segredos) e **worker de deploy em Python (FastAPI)** no loopback,
   com modo seguro (dry-run). Node delega a automação ao worker via `/services/:id/plan`.

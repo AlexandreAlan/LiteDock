@@ -1,6 +1,6 @@
 {
   "name": "litedock",
-  "version": "0.2.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "LiteDock - painel de gerenciamento de servidores e deploys (control plane)",
