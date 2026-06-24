@@ -200,6 +200,18 @@ métricas que se movem e eventos de Docker.
 
 ## Histórico de versões
 
+- **v0.9.2 (ingress dos apps: endereço automático + HTTPS wildcard)** — todo app
+  implantado agora **abre sozinho** num endereço próprio com SSL, sem passo manual.
+  - **Endereço aleatório e único por serviço.** App sem domínio ganha, no 1º deploy,
+    um subdomínio aleatório sob o "Domínio dos serviços" (`*.litedock.morenadoaco.com.br`),
+    ex.: `forte-aguia-76e2.litedock.morenadoaco.com.br`. Multi-tenant: o nome é
+    checado contra colisão e regerado se ocupado (`src/services/naming.ts`).
+  - **Cadeia de ingress.** DNS wildcard (Hostinger) → **nginx** termina o TLS com um
+    **cert wildcard** (`*.litedock...`, via certbot **DNS-01** Hostinger, renova
+    sozinho) → proxy HTTP pro **Traefik** (loopback) → container. O Traefik fica
+    HTTP-only; o nginx faz o HTTPS. Qualquer subdomínio novo já nasce com SSL válido.
+  - **Nome específico** continua opt-in (aba Domains do serviço); como o cert é
+    wildcard, qualquer `<nome>.litedock...` escolhido já tem HTTPS.
 - **v0.9.1 (Docker Socket Proxy + graceful shutdown + launch correto)** — três
   melhorias de segurança/resiliência:
   - **Docker Socket Proxy (Tecnativa).** O Node (dockerode) e o worker Python
