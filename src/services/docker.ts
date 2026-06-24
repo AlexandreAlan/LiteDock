@@ -2,7 +2,17 @@
 import Docker from 'dockerode';
 import { config } from '../config.js';
 
-export const docker = new Docker({ socketPath: config.dockerSocket });
+// Por padrão fala com o socket cru. Se LITEDOCK_DOCKER_PROXY estiver setado
+// (host:porta), passa a falar com o Docker Socket Proxy (superfície restrita).
+function dockerConn() {
+  if (config.dockerProxy) {
+    const [host, port] = config.dockerProxy.split(':');
+    return { host, port: Number(port) || 2375 };
+  }
+  return { socketPath: config.dockerSocket };
+}
+
+export const docker = new Docker(dockerConn());
 
 export interface ContainerInfo {
   id: string;

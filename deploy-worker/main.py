@@ -168,17 +168,23 @@ def logs(container_id: str, tail: int = 200):
 OK_SENTINEL = "__LITEDOCK_NIXPACKS_OK__"
 FAIL_SENTINEL = "__LITEDOCK_NIXPACKS_FAIL__"
 
+# O build SEMPRE fala com o socket REAL, nunca pelo Socket Proxy (que bloqueia
+# BUILD de propósito). Mesmo que o worker rode com DOCKER_HOST=tcp://proxy, os
+# subprocessos de build sobrescrevem pro unix socket.
+REAL_SOCK = os.getenv("DOCKER_REAL_SOCKET", "unix:///var/run/docker.sock")
+REAL_SOCK_ENV = {**os.environ, "DOCKER_HOST": REAL_SOCK}
+
 
 class NixpacksBuild(BaseModel):
     context: str = Field(..., description="diretório do código no host (já clonado)")
     image_tag: str = Field(..., description="tag da imagem a gerar")
 
 
-def _stream_cmd(cmd: list[str]):
+def _stream_cmd(cmd: list[str], env: dict | None = None):
     """Roda um comando e gera (yield) cada linha de saída combinada."""
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,
+        text=True, bufsize=1, env=env,
     )
     assert proc.stdout is not None
     for line in iter(proc.stdout.readline, ""):
@@ -191,7 +197,7 @@ def _stream_cmd(cmd: list[str]):
 def _builder_image_exists() -> bool:
     out = subprocess.run(
         ["docker", "images", "-q", BUILDER_IMAGE],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=REAL_SOCK_ENV,
     )
     return bool(out.stdout.strip())
 
@@ -201,7 +207,7 @@ def _nixpacks_stream(ctx: str, image_tag: str):
     if not _builder_image_exists():
         yield f"Builder ausente → construindo {BUILDER_IMAGE} (só na 1ª vez) ...\n"
         code = 0
-        for item in _stream_cmd(["docker", "build", "-t", BUILDER_IMAGE, BUILDER_DIR]):
+        for item in _stream_cmd(["docker", "build", "-t", BUILDER_IMAGE, BUILDER_DIR], env=REAL_SOCK_ENV):
             if isinstance(item, int):
                 code = item
             else:
@@ -219,7 +225,7 @@ def _nixpacks_stream(ctx: str, image_tag: str):
         "build", "/app", "--name", image_tag,
     ]
     code = 0
-    for item in _stream_cmd(run_cmd):
+    for item in _stream_cmd(run_cmd, env=REAL_SOCK_ENV):
         if isinstance(item, int):
             code = item
         else:

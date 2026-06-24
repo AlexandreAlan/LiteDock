@@ -371,3 +371,53 @@ export async function serviceStats(containerId: string | null) {
     memPct: memLimit ? Number(((memUsage / memLimit) * 100).toFixed(2)) : 0,
   };
 }
+
+// ── Reconciliação de deploys interrompidos (graceful shutdown/boot) ──────────
+// Um deploy roda in-process. Se a API morre no meio (restart da VPS, deploy do
+// painel, crash), a linha do Deployment fica presa em building/deploying e pode
+// sobrar um container temporário `<svc>__deploy-<id>` órfão. Esta função põe a
+// casa em ordem: marca os deploys travados como falha (com nota no log) e
+// remove os containers temporários órfãos. Roda no boot (cobre até crash duro)
+// e no encerramento por sinal (SIGTERM/SIGINT).
+export async function reconcileInterruptedDeploys(reason: string): Promise<{ deployments: number; containers: number }> {
+  let deployments = 0;
+  let containers = 0;
+
+  // 1) Deploys presos → falha limpa.
+  const stuck = await prisma.deployment.findMany({
+    where: { status: { in: ['queued', 'building', 'deploying'] } },
+    select: { id: true, serviceId: true, log: true },
+  });
+  for (const d of stuck) {
+    await prisma.deployment.update({
+      where: { id: d.id },
+      data: {
+        status: 'failed',
+        log: (d.log ? d.log + '\n' : '') + `[reconcile] ${reason} — deploy interrompido, marcado como falha.`,
+        finishedAt: new Date(),
+      },
+    }).catch(() => {});
+    // Serviço que tinha ficado "deploying" volta pra estado de erro visível.
+    await prisma.service.updateMany({
+      where: { id: d.serviceId, status: 'deploying' },
+      data: { status: 'error' },
+    }).catch(() => {});
+    deployments++;
+  }
+
+  // 2) Containers temporários do blue-green que nunca foram promovidos.
+  try {
+    const list = await docker.listContainers({ all: true });
+    for (const c of list) {
+      const name = (c.Names?.[0] || '').replace(/^\//, '');
+      if (name.includes('__deploy-')) {
+        try { await docker.getContainer(c.Id).remove({ force: true }); containers++; } catch { /* já foi */ }
+      }
+    }
+  } catch { /* sem acesso ao Docker agora — segue */ }
+
+  if (deployments || containers) {
+    console.log(`[reconcile] ${reason}: ${deployments} deploy(s) e ${containers} container(es) temporário(s) limpos.`);
+  }
+  return { deployments, containers };
+}

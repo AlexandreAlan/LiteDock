@@ -200,6 +200,33 @@ métricas que se movem e eventos de Docker.
 
 ## Histórico de versões
 
+- **v0.9.1 (Docker Socket Proxy + graceful shutdown + launch correto)** — três
+  melhorias de segurança/resiliência:
+  - **Docker Socket Proxy (Tecnativa).** O Node (dockerode) e o worker Python
+    falam com a Engine por um proxy de **superfície mínima** (`docker-compose.socket-proxy.yml`,
+    loopback `127.0.0.1:2375`) em vez do socket cru. Liberado só o que o LiteDock
+    usa (containers/networks/images + info/version/events/ping); **bloqueado**
+    `exec`, `secrets`, `swarm`, `nodes`, `services`, `plugins`, `build`, `volumes`
+    (todos → 403, validados). Ligado por toggle: API via `LITEDOCK_DOCKER_PROXY`
+    no `.env`; worker via `DOCKER_HOST=tcp://proxy`. O **build** (que o proxy
+    bloqueia de propósito) sempre usa o **socket real** via `DOCKER_REAL_SOCKET`.
+    Roteamento confirmado nos access logs do proxy. *Ressalva honesta:* o proxy
+    filtra por área+método, **não por path/label** — não protege os outros
+    containers de produção de um LiteDock comprometido (isso exigiria daemon/VPS
+    separados ou authz plugin); ele mata a superfície catastrófica (exec/secrets/
+    swarm).
+  - **Graceful shutdown de deploys.** Reconciliação em duas camadas: no **boot**
+    (cobre até crash duro) e no **encerramento por sinal** (SIGTERM/SIGINT) — marca
+    deploys presos (`queued/building/deploying`) como `failed` e remove containers
+    temporários `*__deploy-*` órfãos do blue-green.
+  - **Launch como processo único (correção de raiz).** O pm2 rodava `npm run start`
+    (→ `npm → tsx → node`); o `npm` **não repassava o sinal**, então o graceful
+    shutdown nunca recebia SIGINT — e, pior, processos `node` netos ficavam
+    **órfãos segurando a porta 8088 com código antigo** enquanto o processo
+    gerenciado entrava em crash-loop por `EADDRINUSE`. Agora a API roda como
+    **processo único** via `ecosystem.config.cjs` (`node --import tsx src/server.ts`,
+    `kill_timeout: 12000`), o sinal chega direto no handler e não há mais órfãos.
+    `pm2 save` persiste pra sobreviver a reboot da VPS.
 - **v0.9.0 (build portátil + isolamento do control-plane)** — duas frentes de
   estabilidade/infra:
   - **Nixpacks conteinerizado (portabilidade).** O build de código sem

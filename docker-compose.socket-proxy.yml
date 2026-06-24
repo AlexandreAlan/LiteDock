@@ -1,0 +1,48 @@
+# Docker Socket Proxy (Tecnativa) — superfície MÍNIMA da Docker Engine API.
+# O Node (dockerode) e o worker Python passam a falar com a Engine por aqui,
+# em vez do socket cru. Só as áreas que o LiteDock realmente usa ficam abertas;
+# o resto (exec, secrets, swarm, plugins...) fica BLOQUEADO.
+#
+# Granularidade: o proxy filtra por ÁREA + método (GET sempre; POST/PUT/DELETE
+# só com POST=1). NÃO é por path — então o escopo "só litedock-* / só dangling"
+# do prune/remove continua garantido no NOSSO código, não aqui.
+#
+# Exposto só no loopback (127.0.0.1:2375). Label litedock.managed=true pra o
+# Traefik ignorar. Socket montado read-only (o proxy é quem fala de verdade).
+services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: litedock-docker-proxy
+    restart: unless-stopped
+    privileged: false
+    environment:
+      # ── Habilitado (o que o LiteDock usa) ──
+      POST: 1            # libera create/start/stop/remove/connect... (sem isto = read-only)
+      CONTAINERS: 1      # list/inspect/create/start/stop/restart/remove/logs/stats
+      NETWORKS: 1        # list/inspect/create/remove/connect/disconnect
+      IMAGES: 1          # pull(create)/list/inspect/prune(dangling)
+      INFO: 1            # docker.info (telemetria do painel)
+      VERSION: 1         # docker.version (health/negociação)
+      EVENTS: 1          # stream de eventos (aba Eventos do monitor)
+      PING: 1            # health
+      SYSTEM: 1          # GET /system/df (uso de disco)
+      # ── Bloqueado (superfície perigosa) ──
+      EXEC: 0            # execução de código em container — NÃO usamos
+      SECRETS: 0
+      CONFIGS: 0
+      SWARM: 0
+      NODES: 0
+      SERVICES: 0
+      TASKS: 0
+      PLUGINS: 0
+      VOLUMES: 0         # volumes nomeados nascem no create do container (área CONTAINERS)
+      BUILD: 0           # builds passam FORA do proxy (CLI/sock real no container efêmero)
+      COMMIT: 0
+      AUTH: 0
+      DISTRIBUTION: 0
+    ports:
+      - "127.0.0.1:2375:2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      litedock.managed: "true"

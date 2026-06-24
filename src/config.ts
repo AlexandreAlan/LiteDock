@@ -18,6 +18,10 @@ export const config = {
   port: Number(process.env.PORT || 8088),
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
   dockerSocket: process.env.DOCKER_SOCKET || '/var/run/docker.sock',
+  // Socket Proxy (Tecnativa) opcional: quando LITEDOCK_DOCKER_PROXY=host:porta,
+  // o dockerode fala com a Engine pelo proxy restrito em vez do socket cru.
+  // Vazio (padrão) = socket direto, comportamento de hoje.
+  dockerProxy: process.env.LITEDOCK_DOCKER_PROXY || '',
   databaseUrl: process.env.DATABASE_URL || '',
   redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6390',
   encryptionKey: process.env.ENCRYPTION_KEY || 'dev-encryption-key-change-me-32bytes',
