@@ -110,7 +110,7 @@ export function TemplateCatalog({
 function Card({ tpl, busy, onInstall }: { tpl: TemplateCard; busy: boolean; onInstall: () => void }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-line bg-panel p-3 transition-colors hover:border-brand/40">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-panel2 text-xl">{tpl.logo}</div>
+      <TemplateLogo logo={tpl.logo} name={tpl.name} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium text-ink">{tpl.name}</span>
@@ -127,6 +127,23 @@ function Card({ tpl, busy, onInstall }: { tpl: TemplateCard; busy: boolean; onIn
           {busy ? 'Instalando…' : 'Instalar'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Logotipo oficial via URL; se a imagem falhar, mostra a inicial do nome.
+function TemplateLogo({ logo, name }: { logo: string; name: string }) {
+  const [failed, setFailed] = useState(!logo || !/^https?:\/\//.test(logo));
+  if (failed) {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-panel2 text-sm font-semibold text-muted">
+        {name.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-panel2 p-1.5">
+      <img src={logo} alt={name} loading="lazy" className="h-full w-full object-contain" onError={() => setFailed(true)} />
     </div>
   );
 }

@@ -21,6 +21,7 @@ export function Project() {
 
   const [open, setOpen] = useState(false);
   const [store, setStore] = useState(false);
+  const [nets, setNets] = useState(false);
   const [type, setType] = useState<ServiceType>('app');
   const [engine, setEngine] = useState('postgres');
   const [name, setName] = useState('');
@@ -59,6 +60,7 @@ export function Project() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
         <div className="flex items-center gap-2">
+          <button className="btn-ghost" onClick={() => setNets(true)}><Icon name="globe" className="h-4 w-4" /> Redes</button>
           <button className="btn-ghost" onClick={() => setStore(true)}><Icon name="zap" className="h-4 w-4" /> Templates</button>
           <button className="btn-brand" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Criar serviço</button>
         </div>
@@ -151,6 +153,75 @@ export function Project() {
       </Modal>
 
       <TemplateCatalog projectId={id} open={store} onClose={() => setStore(false)} />
+      <BridgesModal projectId={id} projectName={project.name} open={nets} onClose={() => setNets(false)} />
     </div>
+  );
+}
+
+interface BridgeInfo {
+  connected: { bridgeId: string; id: string; name: string; slug: string }[];
+  available: { id: string; name: string; slug: string }[];
+}
+
+function BridgesModal({ projectId, projectName, open, onClose }: { projectId: string; projectName: string; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ['bridges', projectId],
+    queryFn: () => api.get<BridgeInfo>(`/projects/${projectId}/bridges`),
+    enabled: open,
+  });
+  const [peer, setPeer] = useState('');
+  const connect = useMutation({
+    mutationFn: () => api.post(`/projects/${projectId}/bridges`, { peerId: peer }),
+    onSuccess: () => { setPeer(''); qc.invalidateQueries({ queryKey: ['bridges', projectId] }); },
+  });
+  const disconnect = useMutation({
+    mutationFn: (peerId: string) => api.del(`/projects/${projectId}/bridges/${peerId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bridges', projectId] }),
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} title="Redes do projeto"
+      footer={<button className="btn-ghost" onClick={onClose}>Fechar</button>}>
+      <div className="space-y-4">
+        <div className="flex items-start gap-2 rounded-lg border border-ok/30 bg-ok/5 p-3 text-xs text-muted">
+          <Icon name="globe" className="mt-0.5 h-4 w-4 shrink-0 text-ok" />
+          <span><span className="font-medium text-ink">{projectName}</span> roda numa rede isolada (<code>litedock-net-{/* slug shown by api not needed */''}…</code>). Os serviços daqui se enxergam, mas <span className="text-ink">não conversam com outros projetos</span> — a não ser que você crie uma ponte abaixo.</span>
+        </div>
+
+        {isLoading ? <Spinner /> : (
+          <>
+            <div>
+              <label className="label mb-1.5 block">Pontes ativas</label>
+              {data?.connected.length ? (
+                <div className="space-y-2">
+                  {data.connected.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
+                      <span className="flex items-center gap-2 text-sm text-ink"><Icon name="zap" className="h-3.5 w-3.5 text-brand" /> {p.name}</span>
+                      <button className="text-xs text-bad hover:underline" disabled={disconnect.isPending} onClick={() => disconnect.mutate(p.id)}>desfazer</button>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-xs text-muted">Nenhuma — totalmente isolado.</p>}
+            </div>
+
+            <div>
+              <label className="label mb-1.5 block">Criar ponte com outro projeto</label>
+              <div className="flex gap-2">
+                <select className="field" value={peer} onChange={(e) => setPeer(e.target.value)}>
+                  <option value="">— escolher projeto —</option>
+                  {(data?.available ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <button className="btn-brand shrink-0" disabled={!peer || connect.isPending} onClick={() => connect.mutate()}>
+                  {connect.isPending ? '...' : 'Conectar'}
+                </button>
+              </div>
+              {connect.error && <div className="mt-2"><ErrorNote message={(connect.error as Error).message} /></div>}
+              <p className="mt-1.5 text-xs text-muted">Os serviços de ambos passam a se enxergar pelo nome do container. Vale pros que já estão no ar e pros próximos deploys.</p>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }

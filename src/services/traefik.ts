@@ -8,6 +8,7 @@ export interface RouteOpts {
   hosts: string[];      // dominios (Host rule)
   port: number;         // porta interna do container
   tls: boolean;         // https via Let's Encrypt (resolver 'le')
+  network?: string;     // rede do projeto que o Traefik usa pra alcançar o container
 }
 
 export function traefikLabels(opts: RouteOpts): Record<string, string> {
@@ -16,6 +17,10 @@ export function traefikLabels(opts: RouteOpts): Record<string, string> {
     'litedock.service': opts.serviceId,
     'traefik.enable': 'true',
   };
+
+  // Com várias redes plugadas no Traefik, ele precisa saber por qual rede
+  // alcançar este container (a rede do projeto).
+  if (opts.network) labels['traefik.docker.network'] = opts.network;
 
   if (opts.hosts.length > 0) {
     const r = opts.routerName;

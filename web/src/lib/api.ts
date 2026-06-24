@@ -1,5 +1,8 @@
 // Client HTTP fino sobre a API Fastify do LiteDock. Base sempre "/api"
 // (dev: proxy do Vite; prod: proxy do nginx). Bearer guardado no localStorage.
+// Em MODO DEMO, as chamadas não vão à rede — são servidas por um store falso.
+
+import { DEMO, demoRequest } from './demo';
 
 const TOKEN_KEY = 'litedock_token';
 
@@ -20,6 +23,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (DEMO) return demoRequest<T>(method, path, body);
+
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -67,6 +72,8 @@ export interface User {
   email: string;
   name?: string | null;
   role: string;
+  totpEnabled?: boolean;
+  createdAt?: string;
 }
 export interface Project {
   id: string;

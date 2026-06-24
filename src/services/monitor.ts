@@ -4,6 +4,7 @@
 //  • uso de armazenamento (containers + volumes via `docker system df`)
 import { docker } from './docker.js';
 import { prisma } from '../db.js';
+import { workerPost } from './worker.js';
 
 // ── Stats por container ──────────────────────────────────────────────────
 type NetSnap = { rx: number; tx: number; t: number };
@@ -80,6 +81,7 @@ export async function stopContainer(name: string) { await docker.getContainer(na
 
 // ── Agendador (liga/desliga diário por horário local) ────────────────────
 let schedStarted = false;
+let lastCleanupDay = '';
 export function startScheduler() {
   if (schedStarted) return;
   schedStarted = true;
@@ -91,6 +93,14 @@ export function startScheduler() {
       for (const s of all) {
         if (s.startTime === hhmm) await startContainer(s.containerName).catch(() => {});
         if (s.stopTime === hhmm) await stopContainer(s.containerName).catch(() => {});
+      }
+      // Limpeza diária do Docker às 04:00, se ligada nos ajustes. Segura:
+      // o worker só remove imagens dangling e containers parados do LiteDock.
+      const today = d.toISOString().slice(0, 10);
+      if (hhmm === '04:00' && lastCleanupDay !== today) {
+        lastCleanupDay = today;
+        const flag = await prisma.setting.findUnique({ where: { key: 'dailyDockerCleanup' } });
+        if (flag?.value === 'true') await workerPost('/system/prune').catch(() => {});
       }
     } catch { /* ignora ciclo */ }
   };

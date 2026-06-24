@@ -9,6 +9,7 @@ import {
   genSecret,
   interpolate,
 } from '../services/templates.js';
+import { enqueueDeploy } from '../services/deploy.js';
 
 const slugify = (s: string) =>
   s.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -95,6 +96,15 @@ export default async function templateRoutes(app: FastifyInstance) {
         });
       }
       created.push({ id: service.id, name: service.name, type: service.type });
+    }
+
+    // Auto-deploy: sobe tudo já. Banco primeiro (o app depende dele); o app
+    // entra logo depois (RestartPolicy + blue-green toleram o banco subindo).
+    const dbs = created.filter((s) => s.type === 'database');
+    const apps = created.filter((s) => s.type === 'app');
+    for (const s of dbs) await enqueueDeploy(s.id, 'api').catch(() => {});
+    for (const s of apps) {
+      setTimeout(() => { enqueueDeploy(s.id, 'api').catch(() => {}); }, dbs.length ? 6000 : 0);
     }
 
     reply.code(201);

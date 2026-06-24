@@ -10,8 +10,13 @@ import { api, getToken, setToken, type User } from './api';
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, code?: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
+  updateCredentials: (input: {
+    email?: string;
+    currentPassword: string;
+    newPassword?: string;
+  }) => Promise<void>;
   logout: () => void;
 }
 
@@ -42,10 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, code?: string) {
     const r = await api.post<{ token: string; user: User }>('/auth/login', {
       email,
       password,
+      ...(code ? { code } : {}),
     });
     setToken(r.token);
     setUser(r.user);
@@ -61,13 +67,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(r.user);
   }
 
+  async function updateCredentials(input: {
+    email?: string;
+    currentPassword: string;
+    newPassword?: string;
+  }) {
+    const r = await api.patch<{ token: string; user: User }>('/auth/credentials', input);
+    setToken(r.token);
+    setUser(r.user);
+  }
+
   function logout() {
     setToken(null);
     setUser(null);
   }
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, register, logout }}>
+    <AuthCtx.Provider value={{ user, loading, login, register, updateCredentials, logout }}>
       {children}
     </AuthCtx.Provider>
   );

@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { CommandPalette } from './CommandPalette';
 import { Icon } from './icons';
+import { DEMO } from '../lib/demo';
 
 const NAV = [
   { to: '/', label: 'Projects', end: true, icon: 'grid' as const },
@@ -16,8 +17,6 @@ const NAV = [
 
 const LINKS = [
   { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true, icon: 'book' as const },
-  { label: 'Discord', href: 'https://discord.com', ext: true, icon: 'message' as const },
-  { label: 'Comentários', href: '#', ext: false, icon: 'message' as const },
   { label: 'Registro de alterações', href: '#', ext: false, icon: 'history' as const },
 ];
 
@@ -31,6 +30,13 @@ export function Layout() {
     queryFn: () => api.get<HostMetrics>('/servers/local/metrics'),
     refetchInterval: 5000,
   });
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<Record<string, string>>('/settings'),
+    staleTime: 60_000,
+  });
+  const brandName = settings?.brandName?.trim() || 'LiteDock';
+  const brandLogo = settings?.brandLogoUrl?.trim();
 
   // Atalho global ⌘K / Ctrl+K abre a paleta de comandos.
   useEffect(() => {
@@ -50,13 +56,17 @@ export function Layout() {
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
-            <Icon name="cube" className="h-[18px] w-[18px]" />
+          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-brand text-white">
+            {brandLogo ? (
+              <img src={brandLogo} alt={brandName} className="h-full w-full object-cover" />
+            ) : (
+              <Icon name="cube" className="h-[18px] w-[18px]" />
+            )}
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-bold text-ink">LiteDock</div>
+            <div className="text-sm font-bold text-ink">{brandName}</div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted">
-              <span>v0.6.0</span>
+              <span>v0.9.0</span>
               <span className="rounded border border-line px-1 text-[10px] leading-tight">PT-BR</span>
             </div>
           </div>
@@ -154,8 +164,16 @@ export function Layout() {
       </aside>
 
       {/* ── Conteúdo ──────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto bg-bg px-8 py-7">
-        <Outlet />
+      <main className="flex-1 overflow-y-auto bg-bg">
+        {DEMO && (
+          <div className="flex items-center justify-center gap-2 border-b border-brand/30 bg-brand/10 px-4 py-1.5 text-xs font-medium text-brand-ink">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+            Modo demonstração — dados fictícios, nenhum servidor real é afetado
+          </div>
+        )}
+        <div className="px-8 py-7">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

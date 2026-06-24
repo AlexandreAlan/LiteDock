@@ -9,8 +9,36 @@ import { traefikLabels } from './traefik.js';
 import { buildFromGit } from './build.js';
 import { enqueue } from '../lib/queue.js';
 import { config } from '../config.js';
+import { ensureProjectNetwork } from './worker.js';
 
 const NETWORK = config.traefikNetwork;
+
+// Rede isolada por projeto: serviços do mesmo projeto se enxergam; projetos
+// diferentes ficam em redes separadas (isolados) — só se falam via PONTE.
+export function projectNetwork(slug: string) {
+  return `litedock-net-${slug}`;
+}
+
+// Imagem padrão por engine de banco (quando o serviço é criado pelo painel
+// só com a engine, sem imagem explícita).
+const DB_IMAGES: Record<string, string> = {
+  postgres: 'postgres:16',
+  mysql: 'mysql:8',
+  mariadb: 'mariadb:11',
+  mongo: 'mongo:7',
+  mongodb: 'mongo:7',
+  redis: 'redis:7',
+};
+
+// Redes das PONTES ativas deste projeto (a rede do projeto-par, dos dois lados).
+async function bridgeNetworks(projectId: string): Promise<string[]> {
+  const bridges = await prisma.projectBridge.findMany({
+    where: { OR: [{ aId: projectId }, { bId: projectId }] },
+    include: { a: true, b: true },
+  });
+  const peers = bridges.map((br) => (br.aId === projectId ? br.b : br.a));
+  return peers.map((p) => projectNetwork(p.slug));
+}
 
 type LogFn = (line: string) => void;
 
@@ -38,6 +66,7 @@ async function waitHealthy(
   container: { inspect: () => Promise<any> },
   port: number,
   onLog: LogFn,
+  network = NETWORK,
   timeoutMs = 60000,
 ) {
   const STABLE_MS = 8000;
@@ -52,7 +81,7 @@ async function waitHealthy(
       if (health === 'healthy') { onLog('Healthcheck OK ✓'); return; }
       if (health === 'unhealthy') throw new Error('healthcheck reportou unhealthy');
       if (!health) {
-        const ip: string | undefined = info.NetworkSettings?.Networks?.[NETWORK]?.IPAddress;
+        const ip: string | undefined = info.NetworkSettings?.Networks?.[network]?.IPAddress;
         if (ip && port && (await tcpOk(ip, port))) { onLog(`Porta ${port} respondendo ✓`); return; }
         if (Date.now() - runningSince >= STABLE_MS) { onLog('Container estável ✓'); return; }
       }
@@ -109,10 +138,11 @@ export async function enqueueDeploy(
 
   const service = await prisma.service.findUnique({ where: { id: serviceId } });
   if (!service) throw new Error('serviço não encontrado');
-  if (service.type !== 'app') throw new Error('deploy automático só para apps');
-  const spec = (service.spec ?? {}) as { source?: string; image?: string; repo?: string };
+  const spec = (service.spec ?? {}) as { source?: string; image?: string; engine?: string; repo?: string };
   const isGit = (spec.source ?? (spec.repo ? 'git' : 'image')) === 'git';
-  if (!isGit && !spec.image) throw new Error('spec.image é obrigatório (deploy por imagem)');
+  // Banco pode vir só com a engine (sem imagem) — o deployService resolve a imagem.
+  const hasImage = !!spec.image || (service.type === 'database' && !!spec.engine);
+  if (!isGit && !hasImage) throw new Error('defina a imagem (ou a engine do banco) na aba Source');
   if (isGit && !spec.repo) throw new Error('spec.repo é obrigatório (deploy por código)');
 
   const dep = await prisma.deployment.create({
@@ -132,20 +162,26 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     include: { project: true, envVars: true, domains: true },
   });
   if (!service) throw new Error('serviço não encontrado');
-  if (service.type !== 'app') throw new Error('deploy automático só para apps por enquanto');
 
   const spec = (service.spec ?? {}) as {
     source?: 'image' | 'git';
     image?: string;
+    engine?: string;
     port?: number;
+    ports?: number[];
+    volumes?: string[];
     repo?: string;
     branch?: string;
     subdir?: string;
     dockerfile?: string;
     credentialId?: string;
   };
+  const isDb = service.type === 'database';
+  // Banco sem imagem explícita: deriva da engine escolhida no painel.
+  if (isDb && !spec.image && spec.engine) spec.image = DB_IMAGES[spec.engine] ?? spec.engine;
   const source: 'image' | 'git' = spec.source ?? (spec.repo ? 'git' : 'image');
-  const port = Number(spec.port || 80);
+  // Porta interna: spec.port, ou a 1ª de spec.ports (templates), ou padrão.
+  const port = Number(spec.port || spec.ports?.[0] || (isDb ? 0 : 80));
   if (source === 'image' && !spec.image) throw new Error('spec.image é obrigatório (deploy por imagem)');
   if (source === 'git' && !spec.repo) throw new Error('spec.repo é obrigatório (deploy por código)');
 
@@ -156,7 +192,14 @@ export async function deployService(serviceId: string, deploymentId?: string, on
   const log = (l: string) => { logs.push(l); onLog(l); };
 
   try {
-    await ensureNetwork();
+    // Rede isolada do projeto (criada + Traefik plugado pelo worker Python).
+    const netName = projectNetwork(service.project.slug);
+    await ensureProjectNetwork(service.project.slug).catch(async () => {
+      // Fallback: se o worker estiver fora, cria a rede localmente.
+      const nets = await docker.listNetworks();
+      if (!nets.find((n) => n.Name === netName)) await docker.createNetwork({ Name: netName, Driver: 'bridge' });
+    });
+    const peerNets = await bridgeNetworks(service.project.id);
     await prisma.service.update({ where: { id: serviceId }, data: { status: 'deploying' } });
 
     // Resolve a imagem a subir: build do código (Git) ou pull de imagem pronta.
@@ -185,7 +228,13 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     const env = service.envVars.map((e) => `${e.key}=${e.isSecret ? decrypt(e.value) : e.value}`);
     const hosts = service.domains.map((d) => d.host);
     const tls = service.domains.some((d) => d.https);
-    const labels = traefikLabels({ serviceId, routerName: name, hosts, port, tls });
+    // Banco não entra no Traefik (não tem HTTP); app com domínios entra.
+    const labels = isDb
+      ? { 'litedock.managed': 'true', 'litedock.service': serviceId }
+      : traefikLabels({ serviceId, routerName: name, hosts, port, tls, network: netName });
+
+    // Volumes nomeados pra persistir dados (sobrevivem ao redeploy blue-green).
+    const binds = (spec.volumes ?? []).map((path, i) => `litedock-${service.project.slug}-${service.name}-v${i}:${path}`);
 
     // Blue-green: sobe o novo container com nome temporário, valida a saúde e
     // só então remove o antigo e assume o nome canônico. Se o novo falhar, o
@@ -200,16 +249,26 @@ export async function deployService(serviceId: string, deploymentId?: string, on
       Image: image,
       Env: env,
       Labels: labels,
+      // Alias de rede = nome do serviço, pra outro serviço do projeto resolver
+      // por DNS (ex.: app conecta no banco por "meuapp-db").
+      NetworkingConfig: { EndpointsConfig: { [netName]: { Aliases: [service.name] } } },
       HostConfig: {
         RestartPolicy: { Name: 'unless-stopped' },
-        NetworkMode: NETWORK,
+        NetworkMode: netName,
+        Binds: binds.length ? binds : undefined,
       },
     });
     await container.start();
-    log('Nova versão iniciada, validando saúde ...');
+    log(`Nova versão iniciada na rede isolada ${netName} ...`);
+
+    // Pontes ativas: conecta este container às redes dos projetos-par.
+    for (const peer of peerNets) {
+      try { await docker.getNetwork(peer).connect({ Container: container.id }); log(`Ponte conectada → ${peer}`); }
+      catch { /* já conectado ou rede ausente */ }
+    }
 
     try {
-      await waitHealthy(container, port, log);
+      await waitHealthy(container, port, log, netName);
     } catch (he) {
       // Rollback: descarta a nova versão e mantém a atual no ar intacta.
       log(`Validação falhou: ${(he as Error).message} — revertendo (versão atual segue no ar)`);

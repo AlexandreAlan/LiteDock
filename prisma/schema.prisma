@@ -14,6 +14,8 @@ model User {
   passwordHash String
   name         String?
   role         String       @default("owner") // owner | admin | member
+  totpSecret   String? // segredo TOTP (base32) — null = sem 2FA
+  totpEnabled  Boolean      @default(false)
   createdAt    DateTime     @default(now())
   projects     Project[]
   credentials  Credential[]
@@ -40,8 +42,23 @@ model Project {
   slug      String
   createdAt DateTime  @default(now())
   services  Service[]
+  bridgesA  ProjectBridge[] @relation("BridgeA")
+  bridgesB  ProjectBridge[] @relation("BridgeB")
 
   @@unique([ownerId, slug])
+}
+
+// Ponte de rede entre dois projetos (isolamento é o padrão; a ponte é opt-in).
+// Quando existe, os containers de cada lado entram também na rede do outro.
+model ProjectBridge {
+  id        String   @id @default(uuid())
+  aId       String
+  bId       String
+  a         Project  @relation("BridgeA", fields: [aId], references: [id], onDelete: Cascade)
+  b         Project  @relation("BridgeB", fields: [bId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([aId, bId])
 }
 
 // Serviço = Aplicação OU Banco de dados. Config específica no JSON `spec`.
@@ -130,4 +147,12 @@ model Backup {
   location  String?
   sizeBytes BigInt?
   createdAt DateTime @default(now())
+}
+
+// Configurações gerais do painel (chave-valor). Ex.: domínio do painel,
+// domínio de serviços, e-mail do Let's Encrypt, flags como limpeza diária.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

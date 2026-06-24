@@ -6,7 +6,8 @@ type Name =
   | 'grid' | 'activity' | 'globe' | 'settings' | 'search' | 'sun' | 'moon'
   | 'folder' | 'plus' | 'rotate' | 'play' | 'pause' | 'trash' | 'book'
   | 'zap' | 'chevronRight' | 'cube' | 'refresh' | 'externalLink' | 'rocket'
-  | 'message' | 'history' | 'layout';
+  | 'message' | 'history' | 'layout' | 'eye' | 'eyeOff' | 'shield' | 'user'
+  | 'chevronDown' | 'copy' | 'check' | 'info' | 'server' | 'docker';
 
 // Ícones que usam preenchimento (silhueta) em vez de traço.
 const FILLED: Partial<Record<Name, true>> = { play: true, zap: true };
@@ -35,6 +36,16 @@ const PATHS: Record<Name, JSX.Element> = {
   message: (<path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6A8.4 8.4 0 1 1 21 11.5z" />),
   history: (<><path d="M3 12a9 9 0 1 0 2.6-6.3L3 8" /><path d="M3 4v4h4" /><path d="M12 8v4l3 2" /></>),
   layout: (<><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>),
+  eye: (<><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></>),
+  eyeOff: (<><path d="M3 3l18 18" /><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.3 4.1M6.6 6.6A17.6 17.6 0 0 0 2 12s3.5 7 10 7a10.9 10.9 0 0 0 3.9-.7" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>),
+  shield: (<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />),
+  user: (<><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></>),
+  chevronDown: (<path d="M6 9l6 6 6-6" />),
+  copy: (<><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>),
+  check: (<path d="M20 6L9 17l-5-5" />),
+  info: (<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>),
+  server: (<><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></>),
+  docker: (<><rect x="3" y="10" width="3" height="3" /><rect x="7" y="10" width="3" height="3" /><rect x="11" y="10" width="3" height="3" /><rect x="7" y="6" width="3" height="3" /><path d="M2 13c0 4 3 6 8 6 6 0 9-3 10-7 1 1 2 1 3 0" /></>),
 };
 
 export function Icon({ name, className = 'h-4 w-4', ...rest }: { name: Name } & SVGProps<SVGSVGElement>) {

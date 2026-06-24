@@ -11,8 +11,46 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { config } from '../config.js';
 
 type LogFn = (line: string) => void;
+
+const NIXPACKS_OK = '__LITEDOCK_NIXPACKS_OK__';
+const NIXPACKS_FAIL = '__LITEDOCK_NIXPACKS_FAIL__';
+
+// Build via buildpack (sem Dockerfile) delegado ao worker Python, que roda o
+// nixpacks num container efêmero. Assim o host não precisa do nixpacks instalado
+// — só o Docker. Lê a resposta em streaming e repassa cada linha pro log.
+async function buildNixpacksViaWorker(imageTag: string, ctx: string, onLog: LogFn): Promise<void> {
+  const res = await fetch(`${config.deployWorkerUrl}/build/nixpacks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ context: ctx, image_tag: imageTag }),
+  });
+  if (!res.ok || !res.body) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`worker /build/nixpacks ${res.status}: ${txt || res.statusText}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let ok = false;
+  const handle = (line: string) => {
+    if (line === NIXPACKS_OK || line.startsWith(NIXPACKS_OK)) { ok = true; return; }
+    if (line.startsWith(NIXPACKS_FAIL)) { throw new Error(line.replace(NIXPACKS_FAIL, 'nixpacks:').trim()); }
+    if (line) onLog(line);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n');
+    buf = parts.pop() ?? '';
+    for (const l of parts) handle(l);
+  }
+  if (buf) handle(buf);
+  if (!ok) throw new Error('build nixpacks não confirmou sucesso');
+}
 
 export interface GitSource {
   repo: string;          // URL https do repositório
@@ -71,8 +109,8 @@ export async function buildFromGit(imageTag: string, src: GitSource, onLog: LogF
       onLog('Dockerfile encontrado → docker build');
       await run('docker', ['build', '-t', imageTag, '-f', dockerfile, ctx], process.cwd(), onLog);
     } else {
-      onLog('Sem Dockerfile → nixpacks build (buildpack)');
-      await run('nixpacks', ['build', ctx, '--name', imageTag], process.cwd(), onLog);
+      onLog('Sem Dockerfile → nixpacks build (buildpack, conteinerizado no worker)');
+      await buildNixpacksViaWorker(imageTag, ctx, onLog);
     }
 
     onLog(`Imagem ${imageTag} construída ✓`);

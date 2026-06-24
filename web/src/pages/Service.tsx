@@ -158,13 +158,24 @@ function SourceTab({ s }: { s: ServiceFull }) {
   const [dockerfile, setDockerfile] = useState((spec.dockerfile as string) || '');
   const [image, setImage] = useState((spec.image as string) || '');
   const [port, setPort] = useState(String(spec.port || 3000));
+  const [credentialId, setCredentialId] = useState((spec.credentialId as string) || '');
+
+  const { data: gh } = useQuery({
+    queryKey: ['github-status'],
+    queryFn: () => api.get<{ connected: boolean; login?: string }>('/github/status'),
+  });
+  const { data: ghRepos } = useQuery({
+    queryKey: ['github-repos'],
+    queryFn: () => api.get<{ fullName: string; private: boolean; defaultBranch: string; cloneUrl: string; credentialId: string }[]>('/github/repos'),
+    enabled: !!gh?.connected,
+  });
 
   const save = useMutation({
     mutationFn: () =>
       api.patch(`/services/${s.id}`, {
         spec:
           source === 'git'
-            ? { source: 'git', repo, branch, subdir: subdir || undefined, dockerfile: dockerfile || undefined, port: Number(port), image: undefined }
+            ? { source: 'git', repo, branch, subdir: subdir || undefined, dockerfile: dockerfile || undefined, port: Number(port), image: undefined, credentialId: credentialId || undefined }
             : { source: 'image', image, port: Number(port), repo: undefined },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
@@ -186,7 +197,26 @@ function SourceTab({ s }: { s: ServiceFull }) {
 
       {source === 'git' ? (
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2"><label className="label mb-1 block">Repositório (URL Git)</label><input className="field" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/voce/app.git" /></div>
+          {gh?.connected && (
+            <div className="sm:col-span-2">
+              <label className="label mb-1 block">Conta GitHub conectada (@{gh.login})</label>
+              <select
+                className="field"
+                value={credentialId && repo ? repo : ''}
+                onChange={(e) => {
+                  const r = ghRepos?.find((x) => x.cloneUrl === e.target.value);
+                  if (r) { setRepo(r.cloneUrl); setBranch(r.defaultBranch || 'main'); setCredentialId(r.credentialId); }
+                }}
+              >
+                <option value="">— escolher um repositório —</option>
+                {(ghRepos ?? []).map((r) => (
+                  <option key={r.fullName} value={r.cloneUrl}>{r.fullName}{r.private ? ' 🔒' : ''}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted">Escolha um repo para preencher tudo automaticamente, ou informe a URL manual abaixo. Conecte/gerencie em <Link to="/settings" className="text-brand hover:underline">Ajustes → Github</Link>.</p>
+            </div>
+          )}
+          <div className="sm:col-span-2"><label className="label mb-1 block">Repositório (URL Git)</label><input className="field" value={repo} onChange={(e) => { setRepo(e.target.value); }} placeholder="https://github.com/voce/app.git" /></div>
           <div><label className="label mb-1 block">Branch</label><input className="field" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" /></div>
           <div><label className="label mb-1 block">Build Path (subpasta)</label><input className="field" value={subdir} onChange={(e) => setSubdir(e.target.value)} placeholder="/ (raiz)" /></div>
           <div className="sm:col-span-2"><label className="label mb-1 block">Dockerfile (opcional)</label><input className="field" value={dockerfile} onChange={(e) => setDockerfile(e.target.value)} placeholder="Dockerfile — vazio = Nixpacks detecta a stack" /></div>

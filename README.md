@@ -67,6 +67,26 @@ npm run dev        # http://127.0.0.1:8088
 | POST | `/auth/register` | cria usuário (1º vira `owner`) |
 | POST | `/auth/login` | login → JWT |
 | GET | `/auth/me` | usuário logado |
+| PATCH | `/auth/credentials` | troca e-mail/senha da conta (exige senha atual) |
+| POST | `/auth/2fa/setup` | gera segredo TOTP + otpauth (QR) — ainda não ativa |
+| POST | `/auth/2fa/enable` | confirma o código e liga o 2FA |
+| POST | `/auth/2fa/disable` | desliga o 2FA (exige senha) |
+| GET | `/settings` | configs gerais do painel (chave→valor) |
+| PATCH | `/settings` | grava configs (domínios, e-mail SSL, marca, notificações…) |
+| GET | `/users` | lista usuários (owner/admin) |
+| POST | `/users` | cria usuário (owner/admin) |
+| PATCH | `/users/:id` | altera nome/papel/senha |
+| DELETE | `/users/:id` | remove usuário (protege o último owner) |
+| POST | `/github/connect` | conecta conta GitHub via token (valida + cifra) |
+| GET | `/github/status` | estado da conexão (revalida o token) |
+| GET | `/github/repos` | lista repositórios da conta conectada |
+| DELETE | `/github/disconnect` | desconecta a conta GitHub |
+| GET | `/servers/local/system/df` | uso de disco do Docker (via worker) |
+| GET | `/servers/local/system/worker` | saúde do worker Python |
+| POST | `/servers/local/system/prune` | limpeza **segura** (dangling + containers litedock) |
+| POST | `/servers/local/system/traefik/restart` | reinicia o Traefik |
+| GET | `/servers/local/system/traefik/logs` | logs do Traefik |
+| POST | `/servers/local/system/panel/restart` | reinicia o painel (pm2) |
 | GET | `/projects` | lista projetos |
 | POST | `/projects` | cria projeto |
 | GET | `/projects/:id` | detalhe |
@@ -125,7 +145,46 @@ SAFE_MODE=true uvicorn main:app --host 127.0.0.1 --port 8089
 ```
 
 > O Node fala com o worker via `DEPLOY_WORKER_URL` (default `http://127.0.0.1:8089`).
-> Em produção sobe via pm2 no loopback. Para deploy real: `SAFE_MODE=false`.
+> Em produção sobe via pm2 no loopback. **Em prod já roda com `SAFE_MODE=false`
+> (deploys reais)** — o worker só mexe em containers/rede com prefixo/rótulo
+> `litedock`, nunca nos outros projetos da VPS.
+
+Além do deploy, o worker expõe **ações de sistema** (operação do host, em
+Python): `GET /system/df`, `POST /system/prune` (limpeza **segura** — só
+imagens dangling e containers `litedock-*`), `POST /system/traefik/restart`,
+`GET /system/traefik/logs`, `POST /system/panel/restart`. O Node faz proxy
+dessas rotas em `/servers/local/system/*`.
+
+## Modo demonstração
+
+**No ar:** https://demo.litedock.morenadoaco.com.br
+
+Painel de exemplo para mostrar o LiteDock sem servidor, sem Docker e sem risco —
+todas as chamadas de API são interceptadas e respondidas por um store em memória
+(`web/src/lib/demo.ts`).
+
+> Publicado como SPA estático em `/var/www/clientes-vendas/litedock-demo/dist`
+> (vhost `demo.litedock.morenadoaco.com.br.conf`, SSL Let's Encrypt). Para
+> atualizar: `cd web && npm run build:demo && sudo rsync -a --delete dist/
+> /var/www/clientes-vendas/litedock-demo/dist/`.
+
+```bash
+cd web
+npm run dev:demo        # dev em http://127.0.0.1:5180
+# ou gerar o bundle estático:
+npm run build:demo      # saída em web/dist — pode hospedar em qualquer lugar
+```
+
+Ativação (qualquer uma):
+
+- build com `VITE_DEMO=1` (scripts `dev:demo` / `build:demo`);
+- hostname começando com `demo.` (ex.: `demo.litedock.morenadoaco.com.br`);
+- `?demo=1` na URL (fica salvo no navegador; `?demo=0` desliga).
+
+No login aparece o botão **“Entrar na demonstração”** (qualquer credencial serve)
+e uma faixa fixa avisa que os dados são fictícios. Inclui 3 projetos de exemplo,
+deploy ao vivo com log de build simulado, loja de templates, monitor com
+métricas que se movem e eventos de Docker.
 
 ## Roadmap (fases do MVP)
 
@@ -141,6 +200,89 @@ SAFE_MODE=true uvicorn main:app --host 127.0.0.1 --port 8089
 
 ## Histórico de versões
 
+- **v0.9.0 (build portátil + isolamento do control-plane)** — duas frentes de
+  estabilidade/infra:
+  - **Nixpacks conteinerizado (portabilidade).** O build de código sem
+    Dockerfile não exige mais o `nixpacks` instalado no host. O worker Python
+    roda o nixpacks dentro de um **container efêmero** (imagem
+    `litedock/nixpacks-builder`: nixpacks CLI + docker CLI + buildx),
+    montando o `docker.sock` pra gerar a imagem no Docker Engine do host. A
+    imagem builder é construída sob demanda na 1ª vez. Resultado: a **única
+    dependência do painel volta a ser o Docker**. Logs do build seguem em
+    streaming (linha a linha) pro log do deploy. Novo endpoint
+    `POST /build/nixpacks` no worker (respeita `SAFE_MODE`).
+  - **Isolamento do control-plane.** Postgres/Redis do painel agora numa rede
+    Docker dedicada **`litedock_internal`** (só o control-plane entra), com as
+    portas ainda **só no loopback**. Apps de cliente continuam em
+    `litedock-net-<projeto>` e **não enxergam** o banco/estado do painel
+    (verificado: container de cliente não resolve `litedock-pg`). Mantido o
+    modelo de **uma rede por projeto + Traefik fazendo só o ingress** — mais
+    isolante que uma rede de apps compartilhada (projetos não se cruzam).
+- **v0.9.0 (deploy real dos templates)** — instalar um template agora **sobe
+  sozinho** (auto-deploy: banco primeiro, app em seguida). O deploy passou a
+  suportar **serviços de banco** (imagem derivada da engine), **volumes
+  nomeados** (dados persistem no redeploy) e **alias de rede** = nome do serviço
+  (o app resolve o banco por DNS, ex.: `meuapp-db`). Imagem vem do template; só
+  fica vazia em origem personalizada (Git).
+- **v0.9.0 (loja)** — **Catálogo com ~105 ferramentas** (antes 22), com o
+  **logotipo oficial** de cada uma (CDN dashboard-icons; cai pra inicial se a
+  imagem faltar — chega de emoji em ferramenta profissional). Organizado em 11
+  categorias (Banco de dados, CMS & Blog, Automação & No-code, Analytics & BI,
+  Monitoramento, Dev & Git, Segurança & Senhas, Comunicação, Produtividade &
+  Cloud, Mídia, Ferramentas), tudo no mesmo catálogo com busca + filtros.
+- **v0.9.0** — **Isolamento de rede por projeto + pontes opt-in**. Cada projeto
+  ganha sua própria rede Docker (`litedock-net-<slug>`); os serviços de um
+  projeto se enxergam, mas **projetos diferentes ficam isolados** — só se falam
+  se você criar uma **ponte** (botão *Redes* no projeto). A automação de rede
+  roda no **worker Python** (`/network/{ensure,bridge,connect,disconnect}`):
+  cria a rede, pluga o Traefik e religa os containers ao fazer/desfazer ponte.
+  O deploy (Node) sobe o container já na rede isolada + redes das pontes ativas,
+  com label `traefik.docker.network`. Modelo `ProjectBridge` + rotas
+  `/projects/:id/bridges`.
+- **v0.8.1** — **Conexão GitHub** (aba Github dos Ajustes) funcional via Personal
+  Access Token: o painel valida o token na API do GitHub, mostra usuário/avatar,
+  guarda **cifrado** (AES-256-GCM, modelo `Credential` kind=`github`) e lista os
+  repositórios. Na aba **Source** de cada serviço aparece um **dropdown de
+  repositórios** que preenche URL/branch/credencial num clique — deploy de repo
+  privado e build por push ficam fáceis. Rotas `/github/{connect,status,repos,disconnect}`.
+- **v0.8.0** — **Ajustes 100% funcionais** (nada de stub):
+  - **2FA (TOTP)** real, sem dependências no backend (`src/lib/totp.ts`,
+    RFC 6238): QR via `qrcode` no front, ativar/desativar e **login passa a
+    exigir o código** quando ligado.
+  - **Usuários**: CRUD completo (`/users`) com papéis (owner/admin/member),
+    proteções (não excluir a si mesmo nem o último owner).
+  - **Ações de sistema no worker Python** (não em TS): limpeza **segura** do
+    Docker (só imagens dangling + containers `litedock-*`, nunca prune global
+    — a VPS é compartilhada com várias apps), `df`, reiniciar/ver logs do
+    Traefik, reiniciar o painel. Geral passou a chamar essas ações de verdade.
+    **Limpeza diária** agendada (04:00) no scheduler do Node quando ligada.
+  - Abas **Monitoring / Análise / Cluster / Certificados** mostram dados reais;
+    **Marca** (nome + logo aplicados no painel) e **Notificações** persistidas.
+  - **Deploys reais ligados**: `SAFE_MODE=false` no worker (escopado só a
+    containers/rede `litedock`).
+- **v0.7.1** — Aba **Geral** dos Ajustes no estilo "General" do EasyPanel: barra
+  de ações (menus **Painel / Servidor / Traefik / Docker** + toggle **Limpeza
+  diária do Docker**) com tempo de atividade real, e os cards **Domínio do
+  painel**, **Domínio dos serviços** (com dica de DNS curinga) e **E-mail do
+  Let's Encrypt**. As configs são persistidas de verdade num store chave-valor
+  (modelo `Setting` + **`GET`/`PATCH /settings`**). Os menus de ação
+  (reiniciar/limpar) ainda são placeholders por segurança no servidor real.
+- **v0.7.0** — Página **Ajustes** repaginada no estilo do EasyPanel: layout de
+  duas colunas com sub-navegação (grupos **Usuário** e **Servidor**). A aba
+  padrão **Autenticação** traz os cards **Mudar credenciais** (e-mail, senha
+  atual, nova senha — com mostrar/ocultar) e **Autenticação de dois fatores**.
+  Troca de credenciais é real: novo endpoint **`PATCH /auth/credentials`**
+  (autenticado, exige a senha atual, devolve um JWT novo). A aba **Geral**
+  reúne as informações de servidor/conta/sobre que antes ficavam soltas; as
+  demais abas ficam como "em construção". 2FA por enquanto é só visual.
+- **v0.6.2** — Limpeza da barra lateral: removidos os links **Discord** e
+  **Comentários** do rodapé de navegação (`web/src/components/Layout.tsx`).
+  Sobram **Documentação** e **Registro de alterações**.
+- **v0.6.1** — **Modo demonstração**: build estático (`npm run build:demo`) que
+  serve um painel de exemplo com dados fictícios, sem backend e sem tocar em
+  nenhum container/produção. Toda a UI funciona (projetos, serviços, deploy ao
+  vivo com log progressivo, templates, monitor, métricas). Ver seção
+  [Modo demonstração](#modo-demonstração).
 - **v0.6** — Fase 2: **deploy de código**. Clona o repositório Git e gera a
   imagem por **Dockerfile** (`docker build`) ou **Nixpacks** (buildpack, sem
   Dockerfile) — depois entra no mesmo fluxo blue-green do deploy por imagem.

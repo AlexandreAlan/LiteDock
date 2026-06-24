@@ -1,5 +1,12 @@
-# Infra de desenvolvimento do LiteDock - Postgres + Redis ISOLADOS.
-# Portas so no loopback e fora das faixas de producao (5432/5433/5434, 6379/6380).
+# Control plane do LiteDock: Postgres + Redis do PAINEL (estado interno).
+# ISOLAMENTO:
+#  - portas só no loopback (127.0.0.1) e fora das faixas de produção
+#    (5440->5432, 6390->6379) -> nenhum container de cliente alcança o host loopback
+#  - rede dedicada `litedock_internal`: NENHUM app de cliente entra aqui. Os apps
+#    rodam em `litedock-net-<projeto>` (rede própria por projeto) e o Traefik faz
+#    só o ingress HTTP. Assim o banco/estado do painel fica invisível pros clientes.
+#  - NÃO é `internal: true` de propósito: as portas publicadas em loopback (que a
+#    API/worker do host usam pra conectar) deixam de funcionar em rede internal.
 services:
   db:
     image: postgres:16-alpine
@@ -13,6 +20,8 @@ services:
       - "127.0.0.1:5440:5432"
     volumes:
       - litedock_pgdata:/var/lib/postgresql/data
+    networks:
+      - litedock_internal
 
   redis:
     image: redis:7-alpine
@@ -22,7 +31,14 @@ services:
       - "127.0.0.1:6390:6379"
     volumes:
       - litedock_redisdata:/data
+    networks:
+      - litedock_internal
 
 volumes:
   litedock_pgdata:
   litedock_redisdata:
+
+networks:
+  litedock_internal:
+    name: litedock_internal
+    driver: bridge

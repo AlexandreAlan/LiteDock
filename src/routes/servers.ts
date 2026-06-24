@@ -4,9 +4,37 @@ import { prisma } from '../db.js';
 import { listContainers, engineInfo } from '../services/docker.js';
 import { hostMetrics } from '../services/metrics.js';
 import { containerStats, dockerEvents, storage, startContainer, stopContainer } from '../services/monitor.js';
+import { workerGet, workerPost, workerHealth } from '../services/worker.js';
 
 export default async function serverRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate);
+
+  // ── Ações de sistema do host (delegadas ao worker Python) ──────────────
+  app.get('/local/system/df', async (_req, reply) => {
+    try { return await workerGet('/system/df'); }
+    catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  app.get('/local/system/worker', async () => {
+    try { return { ...(await workerHealth()), online: true }; }
+    catch { return { online: false, ok: false, safeMode: true }; }
+  });
+  app.post('/local/system/prune', async (_req, reply) => {
+    try { return await workerPost('/system/prune'); }
+    catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  app.post('/local/system/traefik/restart', async (_req, reply) => {
+    try { return await workerPost('/system/traefik/restart'); }
+    catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  app.get('/local/system/traefik/logs', async (req, reply) => {
+    const { tail } = req.query as { tail?: string };
+    try { return await workerGet(`/system/traefik/logs?tail=${Number(tail) || 200}`); }
+    catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  app.post('/local/system/panel/restart', async (_req, reply) => {
+    try { return await workerPost('/system/panel/restart'); }
+    catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
 
   // Ping da Docker Engine (versao).
   app.get('/local/engine', async () => engineInfo());
