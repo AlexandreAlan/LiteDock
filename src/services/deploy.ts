@@ -10,6 +10,7 @@ import { buildFromGit } from './build.js';
 import { enqueue } from '../lib/queue.js';
 import { config } from '../config.js';
 import { ensureProjectNetwork } from './worker.js';
+import { servicesBaseDomain, generateUniqueHost } from './naming.js';
 
 const NETWORK = config.traefikNetwork;
 
@@ -226,6 +227,28 @@ export async function deployService(serviceId: string, deploymentId?: string, on
 
     const name = containerName(service.project.slug, service.name);
     const env = service.envVars.map((e) => `${e.key}=${e.isSecret ? decrypt(e.value) : e.value}`);
+
+    // Auto-endereço (multi-tenant): app sem nenhum domínio ganha um subdomínio
+    // ALEATÓRIO e ÚNICO sob o "Domínio dos serviços". https=false porque o nginx
+    // termina o TLS com o cert wildcard e fala HTTP com o Traefik (Traefik fica
+    // no entrypoint web). O usuário não faz nada manual — nasce no 1º deploy.
+    if (!isDb && service.domains.length === 0) {
+      const base = await servicesBaseDomain();
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const host = await generateUniqueHost(base);
+        try {
+          const d = await prisma.domain.create({
+            data: { serviceId, host, targetPort: port, https: false, certStatus: 'active' },
+          });
+          service.domains.push(d);
+          log(`Endereço gerado: https://${host}`);
+          break;
+        } catch {
+          // colisão no @unique (corrida) — tenta outro nome
+        }
+      }
+    }
+
     const hosts = service.domains.map((d) => d.host);
     const tls = service.domains.some((d) => d.https);
     // Banco não entra no Traefik (não tem HTTP); app com domínios entra.
