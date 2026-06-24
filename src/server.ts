@@ -45,7 +45,7 @@ app.setErrorHandler((err, _req, reply) => {
   return reply.code(e.statusCode ?? 500).send({ error: e.message ?? 'erro interno' });
 });
 
-app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.9.1' }));
+app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.9.2' }));
 
 await app.register(authRoutes, { prefix: '/auth' });
 await app.register(projectRoutes, { prefix: '/projects' });
