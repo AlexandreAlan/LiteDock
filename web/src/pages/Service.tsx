@@ -157,7 +157,11 @@ function SourceTab({ s }: { s: ServiceFull }) {
   const [subdir, setSubdir] = useState((spec.subdir as string) || '');
   const [dockerfile, setDockerfile] = useState((spec.dockerfile as string) || '');
   const [image, setImage] = useState((spec.image as string) || '');
-  const [port, setPort] = useState(String(spec.port || 3000));
+  // A porta interna pode estar em `spec.port` (singular) ou `spec.ports[0]` (array,
+  // como vem dos templates). Ler dos dois evita mostrar o default errado (ex.: drawio
+  // expõe 8080, mas caía em 3000 e salvar gravava 3000, quebrando o roteamento).
+  const specPorts = spec.ports as number[] | undefined;
+  const [port, setPort] = useState(String(spec.port || specPorts?.[0] || 3000));
   const [credentialId, setCredentialId] = useState((spec.credentialId as string) || '');
 
   const { data: gh } = useQuery({
