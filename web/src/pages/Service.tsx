@@ -420,6 +420,8 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
         )}
       </Card>
 
+      <LimitsCard s={s} />
+
       <Card title="Zona de perigo">
         <p className="mb-3 text-sm text-muted">Remover o serviço apaga o container e todo o registro. Não tem volta.</p>
         <div className="flex flex-wrap items-end gap-2">
@@ -437,5 +439,61 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
         </div>
       </Card>
     </div>
+  );
+}
+
+// ── Limites de recursos (CPU / RAM / PIDs) ──────────────────────────────
+// Tetos por container — protegem o servidor contra abuso. Vazio = usa o padrão
+// da instância. Salvo em spec.limits e aplicado pelo deploy no próximo build.
+function LimitsCard({ s }: { s: ServiceFull }) {
+  const qc = useQueryClient();
+  const lim = ((s.spec as Record<string, unknown>)?.limits ?? {}) as {
+    memMb?: number;
+    cpus?: number;
+    pidsLimit?: number;
+  };
+  const [mem, setMem] = useState(lim.memMb ? String(lim.memMb) : '');
+  const [cpus, setCpus] = useState(lim.cpus ? String(lim.cpus) : '');
+  const [pids, setPids] = useState(lim.pidsLimit ? String(lim.pidsLimit) : '');
+  const save = useMutation({
+    mutationFn: () =>
+      api.patch(`/services/${s.id}`, {
+        spec: {
+          limits: {
+            memMb: mem ? Number(mem) : undefined,
+            cpus: cpus ? Number(cpus) : undefined,
+            pidsLimit: pids ? Number(pids) : undefined,
+          },
+        },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+  });
+  return (
+    <Card
+      title="Limites de recursos"
+      subtitle="Tetos por container — protegem o servidor contra abuso (CPU/RAM, fork-bomb). Deixe vazio para usar o padrão da instância."
+    >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="label mb-1 block">RAM máx (MB)</label>
+          <input className="field" inputMode="numeric" value={mem} onChange={(e) => setMem(e.target.value)} placeholder="1024 (padrão)" />
+        </div>
+        <div>
+          <label className="label mb-1 block">CPU (vCPUs)</label>
+          <input className="field" inputMode="decimal" value={cpus} onChange={(e) => setCpus(e.target.value)} placeholder="1 (padrão)" />
+        </div>
+        <div>
+          <label className="label mb-1 block">Processos (PIDs)</label>
+          <input className="field" inputMode="numeric" value={pids} onChange={(e) => setPids(e.target.value)} placeholder="512 (padrão)" />
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <button className="btn-brand text-sm" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? 'Salvando…' : 'Salvar limites'}
+        </button>
+        {save.isSuccess && <span className="text-xs text-ok">Salvo ✓ — vale no próximo deploy</span>}
+        {save.error && <ErrorNote message={(save.error as Error).message} />}
+      </div>
+    </Card>
   );
 }
