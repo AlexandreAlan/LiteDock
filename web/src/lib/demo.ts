@@ -482,6 +482,23 @@ function route(method: string, path: string, body: any): unknown {
     if (parts.length === 2 && M === 'PATCH') { s.spec = { ...s.spec, ...(body?.spec || {}) }; return serviceLite(s); }
     if (parts.length === 2 && M === 'DELETE') { store.services = store.services.filter((x) => x.id !== s.id); return { ok: true }; }
 
+    // Histórico de métricas fictício (série ondulada) p/ a aba Métricas da demo.
+    if (parts[2] === 'metrics-history' && M === 'GET') {
+      const n = 60, now = Date.now();
+      const samples = Array.from({ length: n }, (_, i) => {
+        const t = now - (n - 1 - i) * 20000;
+        const w = Math.sin(i / 6) * 0.5 + 0.5;
+        return {
+          t,
+          cpuPct: +(8 + w * 34 + Math.random() * 6).toFixed(2),
+          memBytes: Math.round((120 + w * 80 + Math.random() * 20) * 1024 * 1024),
+          netInBps: Math.round((40 + w * 180 + Math.random() * 30) * 1024),
+          netOutBps: Math.round((20 + w * 90 + Math.random() * 20) * 1024),
+        };
+      });
+      return { samples };
+    }
+
     if (parts[2] === 'deploy' && M === 'POST') {
       const d: DemoDeployment = { id: uid(), status: 'building', trigger: 'manual', startedAt: nowISO(), _start: Date.now() };
       s.deployments.push(d);
