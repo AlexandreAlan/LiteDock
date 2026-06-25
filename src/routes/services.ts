@@ -7,6 +7,7 @@ import { encrypt, decrypt } from '../lib/crypto.js';
 import * as deploy from '../services/deploy.js';
 import { enqueue } from '../lib/queue.js';
 import { workerDeploy, workerHealth, type WorkerSpec } from '../services/worker.js';
+import { getMetricsHistory } from '../services/monitor.js';
 
 // Chave de lock por serviço: deploy e ciclo de vida do mesmo serviço serializam.
 const lockKey = (id: string) => `deploy:${id}`;
@@ -21,6 +22,15 @@ async function loadOwned(req: FastifyRequest, id: string) {
 
 export default async function serviceRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate);
+
+  // Histórico de métricas (CPU/RAM/rede) do container do serviço — alimenta os gráficos.
+  app.get('/:id/metrics-history', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const name = deploy.containerName(s.project.slug, s.name);
+    return { samples: getMetricsHistory(name) };
+  });
 
   // Detalhe (segredos mascarados).
   app.get('/:id', async (req, reply) => {
