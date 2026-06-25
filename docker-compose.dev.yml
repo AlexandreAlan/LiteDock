@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: litedock
-      POSTGRES_PASSWORD: litedock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
       POSTGRES_DB: litedock
     ports:
       - "127.0.0.1:5440:5432"
