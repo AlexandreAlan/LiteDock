@@ -75,6 +75,54 @@ export async function containerStats(): Promise<ContainerStat[]> {
   return rows.sort((a, b) => Number(b.running) - Number(a.running) || b.memBytes - a.memBytes);
 }
 
+// ── Histórico de métricas por serviço (séries temporais em memória) ──────────
+// Amostra só containers GERENCIADOS (poucos) a cada 20s e guarda uma janela
+// rolante. Em memória de propósito: gráfico de monitoramento, não auditoria —
+// reconstrói sozinho após restart, sem custo de banco.
+export interface MetricSample { t: number; cpuPct: number; memBytes: number; netInBps: number; netOutBps: number }
+const HISTORY_CAP = 180; // ~1h a cada 20s
+const history = new Map<string, MetricSample[]>();
+const lastNetHist = new Map<string, NetSnap>();
+
+export function getMetricsHistory(name: string): MetricSample[] {
+  return history.get(name) ?? [];
+}
+
+async function collectMetrics() {
+  const list = await docker.listContainers(); // só em execução
+  const now = Date.now();
+  for (const c of list) {
+    if (c.Labels?.['litedock.managed'] !== 'true') continue; // só serviços do LiteDock
+    const name = (c.Names?.[0] || '').replace(/^\//, '');
+    try {
+      const s: any = await new Promise((res, rej) =>
+        docker.getContainer(c.Id).stats({ stream: false }, (e: unknown, d: unknown) => (e ? rej(e) : res(d))),
+      );
+      const mem = (s.memory_stats?.usage || 0) - (s.memory_stats?.stats?.cache || 0);
+      const net = sumNet(s);
+      const prev = lastNetHist.get(c.Id);
+      let inBps = 0, outBps = 0;
+      if (prev) {
+        const dt = (now - prev.t) / 1000;
+        if (dt > 0) { inBps = Math.max(0, (net.rx - prev.rx) / dt); outBps = Math.max(0, (net.tx - prev.tx) / dt); }
+      }
+      lastNetHist.set(c.Id, { rx: net.rx, tx: net.tx, t: now });
+      const buf = history.get(name) ?? [];
+      buf.push({ t: now, cpuPct: cpuPct(s), memBytes: Math.max(0, mem), netInBps: Math.round(inBps), netOutBps: Math.round(outBps) });
+      while (buf.length > HISTORY_CAP) buf.shift();
+      history.set(name, buf);
+    } catch { /* container sumiu/sem stats — ignora o ciclo */ }
+  }
+}
+
+let collectorStarted = false;
+export function startMetricsCollector() {
+  if (collectorStarted) return;
+  collectorStarted = true;
+  collectMetrics().catch(() => {});
+  setInterval(() => collectMetrics().catch(() => {}), 20_000);
+}
+
 // Só containers GERENCIADOS pelo LiteDock (label litedock.managed=true) podem ser
 // controlados pelo painel — protege os serviços de produção que dividem o mesmo host
 // (trackjus, altivaai, etc.) de serem parados/agendados por engano.
@@ -180,6 +228,7 @@ export async function storage(): Promise<StorageItem[]> {
   return [...volumes, ...containers].filter((x) => x.sizeBytes > 0).sort((a, b) => b.sizeBytes - a.sizeBytes);
 }
 
-// Começa a coletar eventos e o agendador assim que o módulo carrega (boot da API).
+// Começa a coletar eventos, o agendador e o histórico de métricas no boot da API.
 startDockerEvents();
 startScheduler();
+startMetricsCollector();
