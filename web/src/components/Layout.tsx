@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { api, type HostMetrics } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -23,6 +24,7 @@ const LINKS = [
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggle } = useTheme();
   const [palette, setPalette] = useState(false);
   const { data: m } = useQuery({
@@ -94,7 +96,9 @@ export function Layout() {
               className={({ isActive }) =>
                 [
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive ? 'bg-panel2 text-ink' : 'text-ink/70 hover:bg-panel2 hover:text-ink',
+                  isActive
+                    ? 'bg-brand/10 text-ink ring-1 ring-inset ring-brand/25'
+                    : 'text-ink/70 hover:bg-panel2 hover:text-ink',
                 ].join(' ')
               }
             >
@@ -171,9 +175,15 @@ export function Layout() {
             Modo demonstração — dados fictícios, nenhum servidor real é afetado
           </div>
         )}
-        <div className="px-8 py-7">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="px-8 py-7"
+        >
           <Outlet />
-        </div>
+        </motion.div>
       </main>
     </div>
   );
