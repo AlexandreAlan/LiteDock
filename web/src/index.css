@@ -28,15 +28,15 @@
     --c-warn: 217 119 6;
     --c-bad: 220 38 38;
   }
-  /* Tema escuro (Modo oscuro do EasyPanel) — neutros 900/800 + verde mais vivo. */
+  /* Tema escuro premium — quase-preto com leve tom frio + verde vivo (estilo Linear/Vercel). */
   .dark {
     color-scheme: dark;
-    --c-bg: 10 10 10;           /* neutral-950 */
-    --c-panel: 23 23 23;        /* neutral-900 */
-    --c-panel2: 38 38 38;       /* neutral-800 */
-    --c-ink: 245 245 245;       /* neutral-100 */
-    --c-muted: 163 163 163;     /* neutral-400 */
-    --c-line: 64 64 64;         /* neutral-700 */
+    --c-bg: 8 9 13;             /* #08090d — near-black, leve azul */
+    --c-panel: 18 20 27;        /* #12141b — base do vidro */
+    --c-panel2: 28 31 41;       /* #1c1f29 */
+    --c-ink: 237 238 243;
+    --c-muted: 150 154 168;
+    --c-line: 42 46 58;         /* borda sutil */
     --c-brand: 16 185 129;      /* emerald-500 */
     --c-brand-bright: 52 211 153;/* emerald-400 */
     --c-brand-dim: 6 78 59;     /* emerald-900 */
@@ -52,6 +52,17 @@
   }
   body {
     @apply bg-bg text-ink font-sans antialiased;
+  }
+  /* Profundidade ambiente (só no escuro): brilho radial emerald fixo atrás do conteúdo. */
+  .dark body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(900px 620px at 80% -10%, rgb(16 185 129 / 0.10), transparent 60%),
+      radial-gradient(720px 520px at -5% 105%, rgb(16 185 129 / 0.06), transparent 55%);
   }
   ::-webkit-scrollbar {
     width: 10px;
@@ -77,30 +88,80 @@
   .stamp {
     @apply text-xs font-medium text-muted;
   }
-  /* Card branco com borda sutil e sombra leve */
+  /* Card: superfície elevada com transição suave. */
   .card,
   .plate {
-    @apply rounded-xl border border-line bg-panel shadow-card;
+    @apply rounded-xl border border-line bg-panel shadow-card transition-all duration-200;
+  }
+  /* No escuro vira vidro: translúcido + blur + brilho interno sutil. */
+  .dark .card,
+  .dark .plate {
+    background: rgb(var(--c-panel) / 0.72);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-color: rgb(255 255 255 / 0.07);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.04),
+      0 8px 30px -14px rgb(0 0 0 / 0.6);
+  }
+  /* Elemento interativo (card clicável): elevação + realce de borda no hover. */
+  .card-hover {
+    @apply cursor-pointer;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    border-color: rgb(var(--c-brand) / 0.45);
+    box-shadow:
+      0 14px 38px -16px rgb(0 0 0 / 0.55),
+      0 0 0 1px rgb(var(--c-brand) / 0.18);
   }
   .plate-2 {
     @apply rounded-lg border border-line bg-panel2;
   }
-  /* Botão primário azul */
+  /* Botão primário com brilho emerald (glow) e leve elevação no hover. */
   .btn-brand {
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2
-      font-medium text-white shadow-card transition-colors hover:bg-brand-bright
+      font-medium text-white transition-all duration-200 hover:bg-brand-bright
       focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40
       disabled:opacity-50 disabled:cursor-not-allowed;
+    box-shadow: 0 6px 20px -8px rgb(var(--c-brand) / 0.55);
+  }
+  .btn-brand:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px -8px rgb(var(--c-brand) / 0.7);
+  }
+  .btn-brand:active {
+    transform: translateY(0);
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line
-      bg-panel px-3 py-2 text-ink transition-colors hover:bg-panel2
+      bg-panel px-3 py-2 text-ink transition-all duration-200 hover:bg-panel2 hover:border-brand/40
       focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30;
   }
   .field {
     @apply w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink
-      placeholder:text-muted/60 focus:border-brand focus:outline-none
+      transition-colors placeholder:text-muted/60 focus:border-brand focus:outline-none
       focus-visible:ring-2 focus-visible:ring-brand/30;
+  }
+  /* Status "vivo": anel pulsante para online/running (defesa visual = saúde do serviço). */
+  .status-pulse::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--c-ok) / 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(var(--c-ok) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--c-ok) / 0);
   }
 }
 
@@ -108,5 +169,8 @@
   * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  .status-pulse::after {
+    animation: none;
   }
 }
