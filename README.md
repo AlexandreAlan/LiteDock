@@ -200,6 +200,11 @@ métricas que se movem e eventos de Docker.
 
 ## Histórico de versões
 
+- **v0.9.3 (segurança de dependências)** — correção do `fast-jwt` (`<=6.2.3`, GHSA-gmvf-9v4p-v8jc:
+  **bypass de autenticação JWT** quando o resolver assíncrono aceita segredo HMAC vazio, + ReDoS):
+  forçado `fast-jwt@6.2.4` e `uuid` atualizado via `overrides` no `package.json`. `npm audit` agora
+  reporta **0 vulnerabilidades**. Validado: `@fastify/jwt`/`dockerode` carregam, sign/verify OK e
+  HMAC vazio é **rejeitado**. (O painel protótipo passou a montar o `docker.sock` **read-only**.)
 - **v0.9.2 (ingress dos apps: endereço automático + HTTPS wildcard)** — todo app
   implantado agora **abre sozinho** num endereço próprio com SSL, sem passo manual.
   - **Endereço aleatório e único por serviço.** App sem domínio ganha, no 1º deploy,
