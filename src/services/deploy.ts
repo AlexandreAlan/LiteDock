@@ -176,7 +176,14 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     subdir?: string;
     dockerfile?: string;
     credentialId?: string;
+    limits?: { memMb?: number; cpus?: number; pidsLimit?: number };
   };
+  // Limites efetivos: valor configurado por serviço (na GUI → aba Advanced) ou o
+  // default da instância (config). Tetos protegem o host contra abuso (CPU/RAM, fork-bomb).
+  const lim = spec.limits ?? {};
+  const limMemMb = lim.memMb && lim.memMb > 0 ? lim.memMb : config.deployMemMB;
+  const limCpus = lim.cpus && lim.cpus > 0 ? lim.cpus : config.deployCpus;
+  const limPids = lim.pidsLimit && lim.pidsLimit > 0 ? lim.pidsLimit : config.deployPidsLimit;
   const isDb = service.type === 'database';
   // Banco sem imagem explícita: deriva da engine escolhida no painel.
   if (isDb && !spec.image && spec.engine) spec.image = DB_IMAGES[spec.engine] ?? spec.engine;
@@ -279,6 +286,14 @@ export async function deployService(serviceId: string, deploymentId?: string, on
         RestartPolicy: { Name: 'unless-stopped' },
         NetworkMode: netName,
         Binds: binds.length ? binds : undefined,
+        // Limites de recurso por tenant (configuráveis na GUI → aba Advanced; senão
+        // usam o default da instância). Defesa contra abuso de CPU/RAM e fork-bomb.
+        Memory: limMemMb * 1024 * 1024,
+        MemorySwap: limMemMb * 1024 * 1024, // = Memory: sem swap extra além do limite
+        NanoCpus: Math.round(limCpus * 1e9),
+        PidsLimit: limPids,
+        // Impede escalonamento de privilégio dentro do container do tenant.
+        SecurityOpt: ['no-new-privileges:true'],
       },
     });
     await container.start();
