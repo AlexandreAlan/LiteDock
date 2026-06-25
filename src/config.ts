@@ -28,4 +28,10 @@ export const config = {
   traefikNetwork: process.env.TRAEFIK_NETWORK || 'litedock',
   // Worker de automação de deploy (Python/FastAPI, loopback).
   deployWorkerUrl: process.env.DEPLOY_WORKER_URL || 'http://127.0.0.1:8089',
+  // Limites de recurso PADRÃO aplicados a cada container de tenant. Defesa contra
+  // abuso (CPU/RAM exauridos como no incidente do cryptominer, fork-bomb).
+  // Sobrescrevíveis por env por instalação.
+  deployMemMB: Number(process.env.LITEDOCK_DEFAULT_MEM_MB || 1024),   // RAM máx (MB)
+  deployCpus: Number(process.env.LITEDOCK_DEFAULT_CPUS || 1),         // nº de vCPUs
+  deployPidsLimit: Number(process.env.LITEDOCK_DEFAULT_PIDS || 512),  // limite de processos (anti fork-bomb)
 };
