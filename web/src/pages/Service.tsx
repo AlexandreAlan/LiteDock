@@ -12,7 +12,7 @@ const TERMINAL = ['success', 'failed'];
 const isInflight = (st?: string) => !!st && !TERMINAL.includes(st);
 
 // Abas no padrão do EasyPanel (Source · Environment · Domains · Deployments · Logs · Advanced).
-type Tab = 'source' | 'env' | 'domains' | 'deploys' | 'logs' | 'advanced';
+type Tab = 'source' | 'env' | 'domains' | 'deploys' | 'metrics' | 'logs' | 'advanced';
 
 export function Service() {
   const { id = '' } = useParams();
@@ -64,6 +64,7 @@ export function Service() {
     { key: 'env', label: 'Environment', show: true },
     { key: 'domains', label: 'Domains', show: true },
     { key: 'deploys', label: 'Deployments', show: true },
+    { key: 'metrics', label: 'Métricas', show: true },
     { key: 'logs', label: 'Logs', show: true },
     { key: 'advanced', label: 'Advanced', show: true },
   ];
@@ -136,6 +137,7 @@ export function Service() {
       {tab === 'env' && <EnvTab s={s} />}
       {tab === 'domains' && <DomainsTab s={s} />}
       {tab === 'deploys' && <DeploysTab s={s} live={depQ.data} onRedeploy={() => deploy.mutate()} deploying={deploying} />}
+      {tab === 'metrics' && <MetricsTab id={id} />}
       {tab === 'logs' && <LogsTab id={id} />}
       {tab === 'advanced' && <AdvancedTab s={s} onDestroy={() => destroy.mutate()} destroying={destroy.isPending} />}
     </div>
@@ -494,6 +496,80 @@ function LimitsCard({ s }: { s: ServiceFull }) {
         {save.isSuccess && <span className="text-xs text-ok">Salvo ✓ — vale no próximo deploy</span>}
         {save.error && <ErrorNote message={(save.error as Error).message} />}
       </div>
+    </Card>
+  );
+}
+
+// ── Métricas (gráficos de histórico CPU/RAM/rede) ───────────────────────
+type MetricSample = { t: number; cpuPct: number; memBytes: number; netInBps: number; netOutBps: number };
+
+function fmtBytes(n: number) {
+  if (!n || n < 1) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+}
+const fmtBps = (n: number) => `${fmtBytes(n)}/s`;
+
+// Gráfico de área SVG leve (sem lib) — preenche a largura do card.
+function AreaChart({ data, color }: { data: number[]; color: string }) {
+  const W = 300, H = 70, P = 4;
+  if (data.length < 2) {
+    return <div className="flex h-[70px] items-center justify-center text-xs text-muted">coletando…</div>;
+  }
+  const max = Math.max(...data, 1);
+  const stepX = (W - P * 2) / (data.length - 1);
+  const pts = data.map((v, i) => [P + i * stepX, H - P - (v / max) * (H - P * 2)] as const);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${H} L${pts[0][0].toFixed(1)},${H} Z`;
+  const gid = `mc-${color.replace(/[^a-z0-9]/gi, '')}`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[70px] w-full">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+function MetricChart({ label, value, data, color }: { label: string; value: string; data: number[]; color: string }) {
+  return (
+    <div className="plate-2 p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="label">{label}</span>
+        <span className="font-display text-lg font-semibold tabular-nums text-ink">{value}</span>
+      </div>
+      <div className="mt-2"><AreaChart data={data} color={color} /></div>
+    </div>
+  );
+}
+
+function MetricsTab({ id }: { id: string }) {
+  const q = useQuery({
+    queryKey: ['metrics-history', id],
+    queryFn: () => api.get<{ samples: MetricSample[] }>(`/services/${id}/metrics-history`),
+    refetchInterval: 10000,
+  });
+  const samples = q.data?.samples ?? [];
+  const last = samples[samples.length - 1];
+  return (
+    <Card title="Métricas" subtitle="Histórico de uso do container — amostrado a cada 20s (última ~1 hora).">
+      {samples.length < 2 ? (
+        <Empty title="Sem dados ainda" hint="O serviço precisa estar no ar; os gráficos aparecem após alguns ciclos de coleta." />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <MetricChart label="CPU" value={`${(last?.cpuPct ?? 0).toFixed(1)} %`} data={samples.map((s) => s.cpuPct)} color="rgb(16 185 129)" />
+          <MetricChart label="Memória" value={fmtBytes(last?.memBytes ?? 0)} data={samples.map((s) => s.memBytes)} color="rgb(59 130 246)" />
+          <MetricChart label="Rede ↓↑" value={`${fmtBps(last?.netInBps ?? 0)} · ${fmtBps(last?.netOutBps ?? 0)}`} data={samples.map((s) => s.netInBps + s.netOutBps)} color="rgb(168 85 247)" />
+        </div>
+      )}
     </Card>
   );
 }
