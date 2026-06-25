@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { listContainers, engineInfo } from '../services/docker.js';
 import { hostMetrics } from '../services/metrics.js';
-import { containerStats, dockerEvents, storage, startContainer, stopContainer } from '../services/monitor.js';
+import { containerStats, dockerEvents, storage, startContainer, stopContainer, isManaged } from '../services/monitor.js';
 import { workerGet, workerPost, workerHealth } from '../services/worker.js';
 
 export default async function serverRoutes(app: FastifyInstance) {
@@ -66,8 +66,11 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   // Agendamento diário (liga/desliga por horário) por container.
-  app.put('/local/containers/:name/schedule', async (req) => {
+  app.put('/local/containers/:name/schedule', async (req, reply) => {
     const { name } = req.params as { name: string };
+    // Só agenda containers do próprio LiteDock — não toca os de produção do host.
+    if (!(await isManaged(name)))
+      return reply.code(400).send({ error: `"${name}" não é gerenciado pelo LiteDock; agendamento permitido só para serviços do painel.` });
     const body = z.object({
       startTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
       stopTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
