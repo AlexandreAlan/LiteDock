@@ -75,9 +75,27 @@ export async function containerStats(): Promise<ContainerStat[]> {
   return rows.sort((a, b) => Number(b.running) - Number(a.running) || b.memBytes - a.memBytes);
 }
 
-// Liga/desliga um container do host pelo nome.
-export async function startContainer(name: string) { await docker.getContainer(name).start(); }
-export async function stopContainer(name: string) { await docker.getContainer(name).stop(); }
+// Só containers GERENCIADOS pelo LiteDock (label litedock.managed=true) podem ser
+// controlados pelo painel — protege os serviços de produção que dividem o mesmo host
+// (trackjus, altivaai, etc.) de serem parados/agendados por engano.
+export async function isManaged(name: string): Promise<boolean> {
+  try {
+    const info = await docker.getContainer(name).inspect();
+    return info?.Config?.Labels?.['litedock.managed'] === 'true';
+  } catch {
+    return false;
+  }
+}
+async function assertManaged(name: string) {
+  if (!(await isManaged(name)))
+    throw new Error(
+      `Ação bloqueada: "${name}" não é um container gerenciado pelo LiteDock — o painel só controla os próprios serviços, nunca os de produção do host.`,
+    );
+}
+
+// Liga/desliga um container do host pelo nome (somente gerenciados).
+export async function startContainer(name: string) { await assertManaged(name); await docker.getContainer(name).start(); }
+export async function stopContainer(name: string) { await assertManaged(name); await docker.getContainer(name).stop(); }
 
 // ── Agendador (liga/desliga diário por horário local) ────────────────────
 let schedStarted = false;
