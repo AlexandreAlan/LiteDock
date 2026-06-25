@@ -119,34 +119,43 @@ function ServicesTab() {
                   <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? bps(c.netInBps) : '—'}</td>
                   <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? bps(c.netOutBps) : '—'}</td>
                   <td className="py-2.5 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {c.running ? (
+                    {c.managed ? (
+                      <div className="inline-flex items-center gap-1">
+                        {c.running ? (
+                          <button
+                            title="Parar"
+                            disabled={busy === c.name}
+                            onClick={() => { if (confirm(`Parar o container "${c.name}"?`)) action.mutate({ name: c.name, op: 'stop' }); }}
+                            className="rounded border border-line p-1.5 text-muted hover:bg-panel2 hover:text-bad disabled:opacity-50"
+                          >
+                            <Icon name="pause" className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            title="Iniciar"
+                            disabled={busy === c.name}
+                            onClick={() => action.mutate({ name: c.name, op: 'start' })}
+                            className="rounded border border-line p-1.5 text-muted hover:bg-panel2 hover:text-ok disabled:opacity-50"
+                          >
+                            <Icon name="play" className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
-                          title="Parar"
-                          disabled={busy === c.name}
-                          onClick={() => { if (confirm(`Parar o container "${c.name}"?`)) action.mutate({ name: c.name, op: 'stop' }); }}
-                          className="rounded border border-line p-1.5 text-muted hover:bg-panel2 hover:text-bad disabled:opacity-50"
+                          title="Agendar liga/desliga"
+                          onClick={() => setSched(c)}
+                          className={`rounded border border-line p-1.5 hover:bg-panel2 hover:text-ink ${c.schedule?.enabled && (c.schedule.startTime || c.schedule.stopTime) ? 'text-brand' : 'text-muted'}`}
                         >
-                          <Icon name="pause" className="h-3.5 w-3.5" />
+                          <Icon name="history" className="h-3.5 w-3.5" />
                         </button>
-                      ) : (
-                        <button
-                          title="Iniciar"
-                          disabled={busy === c.name}
-                          onClick={() => action.mutate({ name: c.name, op: 'start' })}
-                          className="rounded border border-line p-1.5 text-muted hover:bg-panel2 hover:text-ok disabled:opacity-50"
-                        >
-                          <Icon name="play" className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <button
-                        title="Agendar liga/desliga"
-                        onClick={() => setSched(c)}
-                        className={`rounded border border-line p-1.5 hover:bg-panel2 hover:text-ink ${c.schedule?.enabled && (c.schedule.startTime || c.schedule.stopTime) ? 'text-brand' : 'text-muted'}`}
+                      </div>
+                    ) : (
+                      <span
+                        className="text-[10px] text-muted"
+                        title="Serviço de produção do host — controlado fora do LiteDock (somente visualização)"
                       >
-                        <Icon name="history" className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                        protegido
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
