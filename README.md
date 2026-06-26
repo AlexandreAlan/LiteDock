@@ -47,9 +47,10 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 | **URL aleatória por serviço** | Subdomínio único gerado no 1º deploy (`veloz-aguia-a3f2.seudominio.com`) |
 | **Deploy blue-green** | Nova versão sobe antes de derrubar a anterior — zero downtime |
 | **Log de deploy em tempo real** | Log salvo incrementalmente a cada 2s; auto-scroll; histórico de deploys expandível |
-| **Variáveis de ambiente** | Segredos cifrados AES-256-GCM em repouso; importação em lote |
-| **Monitoramento em tempo real** | CPU / RAM / rede por container + gráficos de histórico (~1h) |
+| **Variáveis de ambiente** | Segredos cifrados AES-256-GCM; importação em lote; revelar/copiar valor; exportar .env |
+| **Monitoramento em tempo real** | CPU / RAM / rede por container + gráficos de histórico (~1h); filtro por nome |
 | **CI/CD por webhook** | URL para colar no GitHub/GitLab — cada push = redeploy automático |
+| **Notificações Discord/Slack** | Webhook configurável em Ajustes → Notificações; botão Testar integrado |
 | **Agendamento** | Liga e desliga containers por horário — configurável na aba Advanced de cada serviço |
 | **Renomear projeto e serviço** | Edição inline com ícone de lápis — slug Docker preservado sem interrupção |
 | **Busca de projetos e serviços** | Filtro em tempo real na página principal (nome do projeto ou serviço) |
@@ -59,7 +60,11 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 | **Multi-tenant seguro** | Containers isolados por projeto; limite de CPU/RAM/PIDs por serviço |
 | **Tema claro/escuro** | Persistido por preferência do usuário |
 | **2FA (TOTP)** | Autenticação em dois fatores para a conta |
-| **Templates** | Catálogo com 1-click deploy (n8n, Grafana, code-server, WordPress…) |
+| **Templates** | Catálogo com 1-click deploy; redireciona para o serviço criado após instalação |
+| **Duplicar serviço** | Clone de serviço com spec e env vars — ideal para ambientes staging/prod |
+| **Histórico de deploys** | Paginado (anterior/próximo) com contagem total |
+| **Status ao vivo** | Backend sincroniza status dos containers com Docker a cada 30s |
+| **Rate limiting** | Proteção brute-force no login (10 tentativas/min por IP) |
 
 ---
 
