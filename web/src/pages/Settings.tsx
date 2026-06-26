@@ -827,7 +827,22 @@ function NotificacoesSection() {
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifyWebhook, setNotifyWebhook] = useState('');
   const [notifyOnDeploy, setNotifyOnDeploy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
   useEffect(() => { if (settings) { setNotifyEmail(settings.notifyEmail ?? ''); setNotifyWebhook(settings.notifyWebhook ?? ''); setNotifyOnDeploy(settings.notifyOnDeploy === 'true'); } }, [settings]);
+
+  async function testWebhook() {
+    if (!notifyWebhook) return;
+    setTestBusy(true);
+    try {
+      await api.post('/settings/test-webhook', { url: notifyWebhook });
+      toast.success('Mensagem de teste enviada com sucesso!');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao enviar teste');
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
   return (
     <Card title="Notificações">
       <div className="max-w-md">
@@ -838,7 +853,12 @@ function NotificacoesSection() {
           </div>
           <div>
             <label className="label mb-1 block">Webhook (Discord/Slack)</label>
-            <input className="field" value={notifyWebhook} onChange={(e) => setNotifyWebhook(e.target.value)} placeholder="https://discord.com/api/webhooks/…" />
+            <div className="flex gap-2">
+              <input className="field flex-1" value={notifyWebhook} onChange={(e) => setNotifyWebhook(e.target.value)} placeholder="https://discord.com/api/webhooks/…" />
+              <button type="button" className="btn-ghost shrink-0 text-xs" disabled={!notifyWebhook || testBusy} onClick={testWebhook}>
+                {testBusy ? '…' : 'Testar'}
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-ink">Avisar em deploys</span>
