@@ -52,6 +52,17 @@ export function Service() {
     mutationFn: () => api.del(`/services/${id}`),
     onSuccess: () => navigate(svc.data?.project ? `/project/${svc.data.project.id}` : '/'),
   });
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState('');
+  const rename = useMutation({
+    mutationFn: () => api.patch(`/services/${id}`, { name: newName }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['service', id] });
+      qc.invalidateQueries({ queryKey: ['project', svc.data?.project?.id] });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      setRenaming(false);
+    },
+  });
 
   if (svc.isLoading) return <Spinner label="carregando serviço…" />;
   if (svc.error) return <ErrorNote message={(svc.error as Error).message} />;
@@ -88,7 +99,35 @@ export function Service() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-xl font-semibold text-ink">{s.name}</h1>
+              {renaming ? (
+                <form
+                  className="flex items-center gap-2"
+                  onSubmit={(e) => { e.preventDefault(); rename.mutate(); }}
+                >
+                  <input
+                    className="field text-xl font-semibold"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(false); }}
+                  />
+                  <button type="submit" className="btn-brand text-sm" disabled={!newName.trim() || rename.isPending}>
+                    {rename.isPending ? '…' : 'Salvar'}
+                  </button>
+                  <button type="button" className="btn-ghost text-sm" onClick={() => setRenaming(false)}>Cancelar</button>
+                </form>
+              ) : (
+                <>
+                  <h1 className="truncate text-xl font-semibold text-ink">{s.name}</h1>
+                  <button
+                    className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink"
+                    title="Renomear serviço"
+                    onClick={() => { setNewName(s.name); setRenaming(true); }}
+                  >
+                    <Icon name="pencil" className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
               <TypeBadge type={s.type} spec={s.spec} />
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-3">
