@@ -389,6 +389,7 @@ function route(method: string, path: string, body: any): unknown {
     for (const [k, v] of Object.entries(body || {})) if (v !== undefined) demoSettings[k] = String(v);
     return { ...demoSettings };
   }
+  if (rawPath === '/settings/test-webhook' && M === 'POST') return { ok: true };
 
   // projects
   if (rawPath === '/projects' && M === 'GET') return store.projects.map(projectView);
@@ -532,9 +533,22 @@ function route(method: string, path: string, body: any): unknown {
     if ((parts[2] === 'start' || parts[2] === 'restart') && M === 'POST') { s.status = 'running'; s.containerId = s.containerId || 'c' + uid(); return { ok: true }; }
     if (parts[2] === 'stop' && M === 'POST') { s.status = 'stopped'; return { ok: true }; }
 
+    if (parts[2] === 'deployments' && !parts[3] && M === 'GET') {
+      const skip = 0; const take = 10;
+      const sorted = [...s.deployments].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+      return { deployments: sorted.slice(skip, skip + take).map(renderDeploy), total: sorted.length };
+    }
     if (parts[2] === 'env' && M === 'POST') { s.envVars.push({ key: body.key, value: body.isSecret ? '••••••••' : body.value, isSecret: !!body.isSecret }); return { ok: true }; }
+    if (parts[2] === 'env' && parts[3] && parts[4] === 'reveal' && M === 'GET') { const k = decodeURIComponent(parts[3]); const ev = s.envVars.find((e) => e.key === k); return { key: k, value: ev?.isSecret ? 'demo-secret-value' : (ev?.value ?? '') }; }
+    if (parts[2] === 'env' && parts[3] && M === 'PATCH') { const k = decodeURIComponent(parts[3]); const ev = s.envVars.find((e) => e.key === k); if (ev) { ev.value = ev.isSecret ? '••••••••' : body.value; } return { ok: true }; }
     if (parts[2] === 'env' && parts[3] && M === 'DELETE') { const k = decodeURIComponent(parts[3]); s.envVars = s.envVars.filter((e) => e.key !== k); return { ok: true }; }
 
+    if (parts[2] === 'duplicate' && M === 'POST') {
+      const newId = uid();
+      const copy = { ...s, id: newId, name: `${s.name}-copia`, status: 'created' as const, containerId: null, deployments: [] };
+      store.services.push(copy);
+      return { id: newId, name: copy.name };
+    }
     if (parts[2] === 'domains' && M === 'POST') { s.domains.push({ id: uid(), host: body.host, targetPort: body.targetPort || 80, https: body.https !== false, certStatus: 'pending' }); return { ok: true }; }
     if (parts[2] === 'domains' && parts[3] && M === 'DELETE') { s.domains = s.domains.filter((d) => d.id !== parts[3]); return { ok: true }; }
 
