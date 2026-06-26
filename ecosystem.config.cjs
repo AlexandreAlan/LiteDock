@@ -16,7 +16,7 @@ module.exports = {
       script: 'src/server.ts',
       interpreter: 'node',
       interpreter_args: '--import tsx',
-      cwd: '/home/alexandrealan/litedock-v2',
+      cwd: '/var/www/litedock/litedock-v2',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
