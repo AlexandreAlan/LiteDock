@@ -347,6 +347,7 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     });
     log('Deploy concluído ✓');
     const url = hosts[0] ? `${tls ? 'https' : 'http'}://${hosts[0]}` : null;
+    fireDeployNotification(service.name, 'success', url).catch(() => {});
     return { deployment: finished, url, container: name };
   } catch (e) {
     stopFlush();
@@ -356,8 +357,31 @@ export async function deployService(serviceId: string, deploymentId?: string, on
       where: { id: dep.id },
       data: { status: 'failed', log: logs.join('\n') + '\nERRO: ' + msg, finishedAt: new Date() },
     }).catch(() => {});
+    fireDeployNotification(service.name, 'failed', null).catch(() => {});
     throw e;
   }
+}
+
+// Envia notificação para o webhook (Discord/Slack) configurado nos Ajustes.
+async function fireDeployNotification(serviceName: string, status: 'success' | 'failed', url: string | null) {
+  const [webhookSetting, onDeploySetting] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: 'notifyWebhook' } }),
+    prisma.setting.findUnique({ where: { key: 'notifyOnDeploy' } }),
+  ]);
+  const webhookUrl = webhookSetting?.value?.trim();
+  if (!webhookUrl || onDeploySetting?.value !== 'true') return;
+
+  const emoji = status === 'success' ? '✅' : '❌';
+  const label = status === 'success' ? 'concluído com sucesso' : 'falhou';
+  const text = `${emoji} LiteDock — Deploy de **${serviceName}** ${label}${url ? `\n${url}` : ''}`;
+
+  // Discord e Slack aceitam payload diferente: detectamos pelo path.
+  const isSlack = webhookUrl.includes('hooks.slack.com');
+  const body = isSlack
+    ? JSON.stringify({ text })
+    : JSON.stringify({ content: text });
+
+  await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
 }
 
 // ---- ciclo de vida ----
