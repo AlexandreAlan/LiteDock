@@ -129,7 +129,14 @@ export default async function serviceRoutes(app: FastifyInstance) {
     if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
     const token = randomBytes(24).toString('hex');
     await prisma.service.update({ where: { id }, data: { deployToken: token } });
-    const base = process.env.PUBLIC_URL || `http://127.0.0.1:${config.port}`;
+    // PUBLIC_URL tem prioridade; fallback lê panelCustomDomain dos ajustes
+    // (inclui /api pois o nginx faz proxy /api/ → backend).
+    let base = process.env.PUBLIC_URL;
+    if (!base) {
+      const setting = await prisma.setting.findUnique({ where: { key: 'panelCustomDomain' } });
+      const domain = setting?.value?.trim() || req.hostname;
+      base = `https://${domain}/api`;
+    }
     return { url: `${base}/webhooks/services/${id}/deploy?token=${token}` };
   });
 
