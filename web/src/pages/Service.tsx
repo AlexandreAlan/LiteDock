@@ -317,7 +317,8 @@ function EnvTab({ s }: { s: ServiceFull }) {
 function DomainsTab({ s }: { s: ServiceFull }) {
   const qc = useQueryClient();
   const [host, setHost] = useState('');
-  const [port, setPort] = useState('3000');
+  const specPort = (s.spec?.port as number | undefined) ?? ((s.spec?.ports as number[] | undefined)?.[0]);
+  const [port, setPort] = useState(String(specPort || 3000));
   const add = useMutation({
     mutationFn: () => api.post(`/services/${s.id}/domains`, { host, targetPort: Number(port), https: true }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setHost(''); },
