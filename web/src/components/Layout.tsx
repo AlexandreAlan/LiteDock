@@ -155,6 +155,28 @@ export function Layout() {
         </nav>
 
         <div className="mt-auto border-t border-line p-4">
+          {m && (
+            <div className="mb-3 space-y-1.5">
+              {([
+                { label: 'CPU', pct: m.cpu.pct },
+                { label: 'RAM', pct: m.memory.pct },
+                { label: 'Disco', pct: m.disk.pct },
+              ] as const).map(({ label, pct }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="w-8 text-[10px] text-muted">{label}</span>
+                  <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-panel2">
+                    <div
+                      className={`absolute inset-y-0 left-0 rounded-full transition-all ${pct >= 90 ? 'bg-bad' : pct >= 75 ? 'bg-warn' : 'bg-ok'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={`w-9 text-right text-[10px] tabular-nums ${pct >= 90 ? 'text-bad' : pct >= 75 ? 'text-warn' : 'text-muted'}`}>
+                    {pct.toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mb-3 flex items-center gap-2 text-xs text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-ok" />
             <span className="font-mono font-medium text-ink">{m?.publicIp ?? m?.hostname ?? 'servidor'}</span>
