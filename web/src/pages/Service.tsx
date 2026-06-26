@@ -86,14 +86,39 @@ export function Service() {
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand/10 text-brand-ink">
             <Icon name="cube" className="h-5 w-5" />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-xl font-semibold text-ink">{s.name}</h1>
               <TypeBadge type={s.type} spec={s.spec} />
             </div>
-            <div className="mt-0.5"><StatusDot state={deploying ? 'restarting' : s.status} withLabel /></div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-3">
+              <StatusDot state={deploying ? 'restarting' : s.status} withLabel />
+              {/* URL do serviço (domínio principal) — visível sempre que existir */}
+              {s.domains && s.domains.length > 0 && (
+                <a
+                  href={`${s.domains[0].https !== false ? 'https' : 'http'}://${s.domains[0].host}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-muted hover:text-brand truncate max-w-xs"
+                >
+                  <Icon name="globe" className="h-3 w-3 shrink-0" />
+                  {s.domains[0].host}
+                </a>
+              )}
+            </div>
           </div>
           <div className="ml-auto flex flex-wrap gap-2">
+            {/* Botão ABRIR — aparece quando o serviço tem domínio (rodando ou não) */}
+            {isApp && s.domains && s.domains.length > 0 && (
+              <a
+                href={`${s.domains[0].https !== false ? 'https' : 'http'}://${s.domains[0].host}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-brand/40 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-ink transition-colors hover:bg-brand/20"
+              >
+                <Icon name="externalLink" className="h-4 w-4" /> Abrir
+              </a>
+            )}
             {isApp && (
               <button
                 onClick={() => deploy.mutate()}
@@ -105,9 +130,11 @@ export function Service() {
             )}
             {s.status === 'running' || s.status === 'online' ? (
               <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="rotate" className="h-4 w-4" /> Restart</button>
-            ) : (
-              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending || !s.containerId} className="btn-ghost text-sm"><Icon name="play" className="h-4 w-4" /> Start</button>
-            )}
+            ) : s.containerId ? (
+              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="play" className="h-4 w-4" /> Start</button>
+            ) : isApp ? (
+              <span className="text-xs text-muted px-2">← faça Deploy para iniciar</span>
+            ) : null}
             {(s.status === 'running' || s.status === 'online') && (
               <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="pause" className="h-4 w-4" /> Stop</button>
             )}
