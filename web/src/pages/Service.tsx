@@ -360,9 +360,14 @@ function parseEnvText(text: string): { key: string; value: string }[] {
     .filter(({ key }) => /^[A-Z_][A-Z0-9_]*$/i.test(key));
 }
 
-function EnvRow({ svcId, envKey, masked, isSecret, onRemoved }: { svcId: string; envKey: string; masked: string; isSecret: boolean; onRemoved: () => void }) {
+function EnvRow({ svcId, envKey, masked, isSecret, onRemoved, onUpdated }: {
+  svcId: string; envKey: string; masked: string; isSecret: boolean; onRemoved: () => void; onUpdated: () => void;
+}) {
   const [revealed, setRevealed] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
   const shown = revealed ?? masked;
 
   async function reveal() {
@@ -384,6 +389,51 @@ function EnvRow({ svcId, envKey, masked, isSecret, onRemoved }: { svcId: string;
     toast.success('Valor copiado.');
   }
 
+  async function startEdit() {
+    if (isSecret && !revealed) {
+      setLoading(true);
+      try {
+        const r = await api.get<{ value: string }>(`/services/${svcId}/env/${encodeURIComponent(envKey)}/reveal`);
+        setEditVal(r.value);
+      } catch { setEditVal(''); } finally { setLoading(false); }
+    } else {
+      setEditVal(revealed ?? masked);
+    }
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    setSaveBusy(true);
+    try {
+      await api.patch(`/services/${svcId}/env/${encodeURIComponent(envKey)}`, { value: editVal });
+      setEditing(false);
+      setRevealed(null);
+      toast.success('Variável atualizada.');
+      onUpdated();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="flex items-center gap-2 py-2 text-sm">
+        <span className="font-mono font-medium text-ink shrink-0 w-40 truncate">{envKey}</span>
+        <input
+          className="field flex-1 font-mono text-xs"
+          value={editVal}
+          onChange={(e) => setEditVal(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); if (e.key === 'Enter') saveEdit(); }}
+        />
+        <button onClick={saveEdit} disabled={saveBusy} className="btn-brand text-xs px-2 py-1">{saveBusy ? '…' : 'OK'}</button>
+        <button onClick={() => setEditing(false)} className="btn-ghost text-xs px-2 py-1">✕</button>
+      </li>
+    );
+  }
+
   return (
     <li className="flex items-center justify-between gap-2 py-2 text-sm">
       <span className="font-mono font-medium text-ink shrink-0">{envKey}</span>
@@ -396,6 +446,9 @@ function EnvRow({ svcId, envKey, masked, isSecret, onRemoved }: { svcId: string;
         )}
         <button onClick={copy} title="Copiar valor" className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink">
           <Icon name="copy" className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={startEdit} disabled={loading} title="Editar valor" className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink disabled:opacity-40">
+          <Icon name="pencil" className="h-3.5 w-3.5" />
         </button>
         <button onClick={onRemoved} className="text-xs text-bad hover:underline">remover</button>
       </span>
@@ -509,6 +562,7 @@ function EnvTab({ s }: { s: ServiceFull }) {
               masked={e.value}
               isSecret={e.isSecret}
               onRemoved={() => del.mutate(e.key)}
+              onUpdated={() => qc.invalidateQueries({ queryKey: ['service', s.id] })}
             />
           ))}
         </ul>
