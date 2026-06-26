@@ -275,10 +275,31 @@ function SourceTab({ s }: { s: ServiceFull }) {
 }
 
 // ── Environment ─────────────────────────────────────────────────────────
+function parseEnvText(text: string): { key: string; value: string }[] {
+  return text.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#') && line.includes('='))
+    .map((line) => {
+      const eq = line.indexOf('=');
+      const key = line.slice(0, eq).trim();
+      let value = line.slice(eq + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      return { key, value };
+    })
+    .filter(({ key }) => /^[A-Z_][A-Z0-9_]*$/i.test(key));
+}
+
 function EnvTab({ s }: { s: ServiceFull }) {
   const qc = useQueryClient();
   const [k, setK] = useState('');
   const [v, setV] = useState('');
+  const [bulk, setBulk] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkErr, setBulkErr] = useState('');
+
   const add = useMutation({
     mutationFn: () => api.post(`/services/${s.id}/env`, { key: k, value: v, isSecret: true }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setK(''); setV(''); },
@@ -287,8 +308,54 @@ function EnvTab({ s }: { s: ServiceFull }) {
     mutationFn: (key: string) => api.del(`/services/${s.id}/env/${encodeURIComponent(key)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
   });
+
+  async function importBulk() {
+    const pairs = parseEnvText(bulkText);
+    if (!pairs.length) { setBulkErr('Nenhuma variável válida encontrada.'); return; }
+    setBulkBusy(true); setBulkErr('');
+    try {
+      for (const { key, value } of pairs) {
+        await api.post(`/services/${s.id}/env`, { key, value, isSecret: true });
+      }
+      qc.invalidateQueries({ queryKey: ['service', s.id] });
+      setBulk(false);
+      setBulkText('');
+    } catch (e: unknown) {
+      setBulkErr(e instanceof Error ? e.message : 'Falha ao importar');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   return (
-    <Card title="Environment" subtitle="Variáveis de ambiente (segredos cifrados AES-256-GCM em repouso).">
+    <Card
+      title="Environment"
+      subtitle="Variáveis de ambiente (segredos cifrados AES-256-GCM em repouso)."
+      right={
+        <button onClick={() => { setBulk((b) => !b); setBulkErr(''); }} className="btn-ghost text-xs">
+          {bulk ? '✕ Fechar' : 'Importar .env'}
+        </button>
+      }
+    >
+      {bulk && (
+        <div className="mb-4 space-y-2 rounded-lg border border-brand/30 bg-brand/5 p-3">
+          <label className="label block">Cole o conteúdo do arquivo .env</label>
+          <textarea
+            className="field h-36 font-mono text-xs"
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder={'DATABASE_URL=postgres://...\nREDIS_URL=redis://...\nSECRET_KEY=abc123'}
+            autoFocus
+          />
+          <div className="flex items-center gap-3">
+            <button className="btn-brand text-sm" disabled={!bulkText.trim() || bulkBusy} onClick={importBulk}>
+              {bulkBusy ? 'Importando…' : `Importar ${parseEnvText(bulkText).length} variáveis`}
+            </button>
+            {bulkErr && <span className="text-xs text-bad">{bulkErr}</span>}
+          </div>
+        </div>
+      )}
+
       {s.envVars && s.envVars.length > 0 ? (
         <ul className="mb-4 divide-y divide-line">
           {s.envVars.map((e) => (
@@ -309,6 +376,7 @@ function EnvTab({ s }: { s: ServiceFull }) {
         <div className="flex-1"><label className="label mb-1 block">Valor</label><input className="field font-mono" value={v} onChange={(e) => setV(e.target.value)} placeholder="postgres://…" /></div>
         <button className="btn-brand text-sm" disabled={!k || add.isPending} onClick={() => add.mutate()}>{add.isPending ? 'Salvando…' : 'Adicionar'}</button>
       </div>
+      {add.error && <div className="mt-2"><ErrorNote message={(add.error as Error).message} /></div>}
     </Card>
   );
 }
