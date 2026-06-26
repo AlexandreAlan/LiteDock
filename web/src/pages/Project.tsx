@@ -244,11 +244,13 @@ function BridgesModal({ projectId, projectName, open, onClose }: { projectId: st
   const [peer, setPeer] = useState('');
   const connect = useMutation({
     mutationFn: () => api.post(`/projects/${projectId}/bridges`, { peerId: peer }),
-    onSuccess: () => { setPeer(''); qc.invalidateQueries({ queryKey: ['bridges', projectId] }); },
+    onSuccess: () => { setPeer(''); qc.invalidateQueries({ queryKey: ['bridges', projectId] }); toast.success('Projetos conectados — serviços se enxergam agora.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const disconnect = useMutation({
     mutationFn: (peerId: string) => api.del(`/projects/${projectId}/bridges/${peerId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['bridges', projectId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['bridges', projectId] }); toast.success('Ponte removida.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   return (
