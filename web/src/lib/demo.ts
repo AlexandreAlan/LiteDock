@@ -269,6 +269,7 @@ function containerStats(): ContainerStat[] {
       const running = runningState.get(cname) ?? s.status !== 'stopped';
       return {
         id: s.containerId!, name: cname, project: proj?.name ?? null, managed: true,
+        serviceId: s.id,
         state: running ? 'running' : 'exited', running,
         cpuPct: running ? jitter(s.type === 'database' ? 1.2 : 6, 5, 0, 100) : 0,
         memBytes: running ? jitter(s.type === 'database' ? 140 : 80, 40, 30, 512) * 1024 ** 2 : 0,
@@ -281,6 +282,7 @@ function containerStats(): ContainerStat[] {
     const running = runningState.get(name) ?? true;
     return {
       id: 'sys-' + name, name, project: null, managed: false,
+      serviceId: null,
       state: running ? 'running' : 'exited', running,
       cpuPct: running ? jitter(0.6, 0.8, 0, 100) : 0,
       memBytes: running ? jitter(60, 20, 20, 256) * 1024 ** 2 : 0,
