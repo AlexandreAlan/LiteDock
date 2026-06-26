@@ -11,6 +11,7 @@ import { Vps as Monitor } from './pages/Vps';
 import { Domains } from './pages/Domains';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
+import { Activity } from './pages/Activity';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ export function App() {
         <Route path="/domains" element={<Domains />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/activity" element={<Activity />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
