@@ -7,7 +7,7 @@ type Name =
   | 'folder' | 'plus' | 'rotate' | 'play' | 'pause' | 'trash' | 'book'
   | 'zap' | 'chevronRight' | 'cube' | 'refresh' | 'externalLink' | 'rocket'
   | 'message' | 'history' | 'layout' | 'eye' | 'eyeOff' | 'shield' | 'user'
-  | 'chevronDown' | 'copy' | 'check' | 'info' | 'server' | 'docker';
+  | 'chevronDown' | 'copy' | 'check' | 'info' | 'server' | 'docker' | 'pencil';
 
 // Ícones que usam preenchimento (silhueta) em vez de traço.
 const FILLED: Partial<Record<Name, true>> = { play: true, zap: true };
@@ -46,6 +46,7 @@ const PATHS: Record<Name, JSX.Element> = {
   info: (<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>),
   server: (<><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></>),
   docker: (<><rect x="3" y="10" width="3" height="3" /><rect x="7" y="10" width="3" height="3" /><rect x="11" y="10" width="3" height="3" /><rect x="7" y="6" width="3" height="3" /><path d="M2 13c0 4 3 6 8 6 6 0 9-3 10-7 1 1 2 1 3 0" /></>),
+  pencil: (<><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></>),
 };
 
 export function Icon({ name, className = 'h-4 w-4', ...rest }: { name: Name } & SVGProps<SVGSVGElement>) {
