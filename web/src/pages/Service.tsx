@@ -88,6 +88,21 @@ export function Service() {
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
+  // Atalho Ctrl+Enter / Cmd+Enter para disparar deploy (quando não está em campo de texto).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== 'Enter') return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const s2 = svc.data;
+      if (!s2 || s2.type !== 'app' || deploy.isPending) return;
+      e.preventDefault();
+      deploy.mutate();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [svc.data, deploy]);
+
   if (svc.isLoading) return <Spinner label="carregando serviço…" />;
   if (svc.error) return <ErrorNote message={(svc.error as Error).message} />;
   const s = svc.data!;
@@ -191,6 +206,7 @@ export function Service() {
               <button
                 onClick={() => deploy.mutate()}
                 disabled={deploying}
+                title="Deploy (Ctrl+Enter)"
                 className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright disabled:opacity-60"
               >
                 {deploying ? <><Spin /> Implantando…</> : <><Icon name="rocket" className="h-4 w-4" /> Deploy</>}
