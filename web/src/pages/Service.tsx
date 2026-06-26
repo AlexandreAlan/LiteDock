@@ -544,7 +544,17 @@ function DomainsTab({ s }: { s: ServiceFull }) {
 // ── Deployments (com deploy ao vivo) ────────────────────────────────────
 function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?: Deployment; onRedeploy: () => void; deploying: boolean }) {
   const [expandedDep, setExpandedDep] = useState<string | null>(null);
-  const logRef = useRef<HTMLPreElement>(null);
+  const [logRef] = [useRef<HTMLPreElement>(null)];
+  const [skip, setSkip] = useState(0);
+  const PAGE = 10;
+  const moreQ = useQuery({
+    queryKey: ['deployments', s.id, skip],
+    queryFn: () => api.get<{ deployments: Deployment[]; total: number }>(`/services/${s.id}/deployments?skip=${skip}&take=${PAGE}`),
+    enabled: skip > 0,
+  });
+  const moreData = moreQ.data as { deployments: Deployment[]; total: number } | undefined;
+  const shown: Deployment[] = skip === 0 ? (s.deployments ?? []) : (moreData?.deployments ?? s.deployments ?? []);
+  const total = moreData?.total ?? shown.length;
 
   // Auto-scroll durante deploy ao vivo.
   useEffect(() => {
@@ -573,9 +583,9 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
         <div className="mb-3">
           <button onClick={onRedeploy} disabled={deploying} className="btn-ghost text-sm">{deploying ? 'Implantando…' : <><Icon name="rotate" className="h-4 w-4" /> Reimplantar</>}</button>
         </div>
-        {s.deployments && s.deployments.length > 0 ? (
+        {shown.length > 0 ? (
           <ul className="divide-y divide-line">
-            {s.deployments.map((d) => (
+            {shown.map((d) => (
               <li key={d.id}>
                 <button
                   className="flex w-full items-center justify-between py-2 text-sm hover:bg-panel2/50 px-1 rounded transition-colors"
@@ -609,6 +619,19 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
           </ul>
         ) : (
           <Empty title="Sem implantações" hint="Configure a origem na aba Source e clique em Deploy." />
+        )}
+        {shown.length > 0 && (
+          <div className="mt-3 flex items-center gap-3">
+            {skip > 0 && (
+              <button className="btn-ghost text-xs" onClick={() => setSkip(Math.max(0, skip - PAGE))}>← Anteriores</button>
+            )}
+            {shown.length === PAGE && (skip + PAGE) < total && (
+              <button className="btn-ghost text-xs" disabled={moreQ.isFetching} onClick={() => setSkip(skip + PAGE)}>
+                {moreQ.isFetching ? 'Carregando…' : 'Carregar mais →'}
+              </button>
+            )}
+            <span className="ml-auto text-xs text-muted">{skip + 1}–{Math.min(skip + shown.length, total)} de {total}</span>
+          </div>
         )}
       </Card>
     </div>
