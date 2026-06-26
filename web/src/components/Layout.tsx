@@ -16,9 +16,7 @@ const NAV = [
   { to: '/domains', label: 'Domínios', icon: 'globe' as const },
   { to: '/settings', label: 'Ajustes', icon: 'settings' as const },
 ];
-const NAV_ADMIN = [
-  { to: '/users', label: 'Usuários', icon: 'users' as const },
-];
+const NAV_ADMIN: { to: string; label: string; icon: 'users' }[] = [];
 
 const LINKS = [
   { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true, icon: 'book' as const },

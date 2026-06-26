@@ -10,7 +10,6 @@ import { Service } from './pages/Service';
 import { Vps as Monitor } from './pages/Vps';
 import { Domains } from './pages/Domains';
 import { Settings } from './pages/Settings';
-import { Users } from './pages/Users';
 import { Activity } from './pages/Activity';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -43,7 +42,6 @@ export function App() {
         <Route path="/monitor" element={<Monitor />} />
         <Route path="/domains" element={<Domains />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/users" element={<Users />} />
         <Route path="/activity" element={<Activity />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
