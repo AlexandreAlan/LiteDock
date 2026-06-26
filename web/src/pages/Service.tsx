@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from '../lib/toast';
 import { api, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
 import { Card } from '../components/Card';
 import { StatusDot } from '../components/StatusDot';
@@ -32,7 +33,10 @@ export function Service() {
   // Ao terminar um deploy, atualiza o serviço (status/containers).
   useEffect(() => {
     const st = depQ.data?.status;
-    if (st && TERMINAL.includes(st)) qc.invalidateQueries({ queryKey: ['service', id] });
+    if (!st || !TERMINAL.includes(st)) return;
+    qc.invalidateQueries({ queryKey: ['service', id] });
+    if (st === 'success') toast.success('Deploy concluído com sucesso!');
+    else if (st === 'failed') toast.error('Deploy falhou — veja o log na aba Deployments.');
   }, [depQ.data?.status, id, qc]);
   // Se já houver um deploy em andamento ao abrir a página, retoma o acompanhamento.
   useEffect(() => {
@@ -42,15 +46,18 @@ export function Service() {
 
   const deploy = useMutation({
     mutationFn: () => api.post<DeployStart>(`/services/${id}/deploy`),
-    onSuccess: (r) => { setActiveDep(r.deploymentId); setTab('deploys'); },
+    onSuccess: (r) => { setActiveDep(r.deploymentId); setTab('deploys'); toast.info('Deploy iniciado — acompanhe o log abaixo.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const lifecycle = useMutation({
     mutationFn: (action: 'start' | 'stop' | 'restart') => api.post(`/services/${id}/${action}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', id] }),
+    onSuccess: (_d, action) => { qc.invalidateQueries({ queryKey: ['service', id] }); toast.success(`Container ${action === 'start' ? 'iniciado' : action === 'stop' ? 'parado' : 'reiniciado'}.`); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const destroy = useMutation({
     mutationFn: () => api.del(`/services/${id}`),
     onSuccess: () => navigate(svc.data?.project ? `/project/${svc.data.project.id}` : '/'),
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -61,7 +68,9 @@ export function Service() {
       qc.invalidateQueries({ queryKey: ['project', svc.data?.project?.id] });
       qc.invalidateQueries({ queryKey: ['projects'] });
       setRenaming(false);
+      toast.success('Serviço renomeado.');
     },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   if (svc.isLoading) return <Spinner label="carregando serviço…" />;
@@ -341,11 +350,13 @@ function EnvTab({ s }: { s: ServiceFull }) {
 
   const add = useMutation({
     mutationFn: () => api.post(`/services/${s.id}/env`, { key: k, value: v, isSecret: true }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setK(''); setV(''); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setK(''); setV(''); toast.success(`Variável adicionada.`); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const del = useMutation({
     mutationFn: (key: string) => api.del(`/services/${s.id}/env/${encodeURIComponent(key)}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); toast.success('Variável removida.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   async function importBulk() {
@@ -645,7 +656,8 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
   const [confirm, setConfirm] = useState('');
   const gen = useMutation({
     mutationFn: () => api.post<WebhookInfo>(`/services/${s.id}/webhook`),
-    onSuccess: (r) => setWebhook(r.url),
+    onSuccess: (r) => { setWebhook(r.url); toast.success('URL do webhook gerada.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   return (
     <div className="space-y-5">
