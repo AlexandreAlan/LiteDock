@@ -45,7 +45,7 @@ export default async function userRoutes(app: FastifyInstance) {
     // Só owner pode criar outro owner.
     if (body.role === 'owner' && req.user.role !== 'owner')
       return reply.code(403).send({ error: 'apenas o owner pode criar outro owner' });
-    const passwordHash = await bcrypt.hash(body.password, 10);
+    const passwordHash = await bcrypt.hash(body.password, 12);
     const user = await prisma.user.create({
       data: { email: body.email, passwordHash, name: body.name, role: body.role },
       select: safe,
@@ -66,7 +66,7 @@ export default async function userRoutes(app: FastifyInstance) {
     const data: { name?: string; role?: string; passwordHash?: string } = {};
     if (body.name !== undefined) data.name = body.name;
     if (body.role) data.role = body.role;
-    if (body.password) data.passwordHash = await bcrypt.hash(body.password, 10);
+    if (body.password) data.passwordHash = await bcrypt.hash(body.password, 12);
     return prisma.user.update({ where: { id }, data, select: safe });
   });
 
