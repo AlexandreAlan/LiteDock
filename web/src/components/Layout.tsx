@@ -18,8 +18,15 @@ const NAV = [
 
 const LINKS = [
   { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true, icon: 'book' as const },
-  { label: 'Registro de alterações', href: '#', ext: false, icon: 'history' as const },
+  { label: 'Registro de alterações', href: 'https://github.com/AlexandreAlan/LiteDock/releases', ext: true, icon: 'history' as const },
 ];
+
+function semverGt(a: string, b: string): boolean {
+  const parse = (s: string) => s.replace(/^v/, '').split('.').map(Number);
+  const [a1, a2, a3] = parse(a);
+  const [b1, b2, b3] = parse(b);
+  return a1 !== b1 ? a1 > b1 : a2 !== b2 ? a2 > b2 : a3 > b3;
+}
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -37,6 +44,28 @@ export function Layout() {
     queryFn: () => api.get<Record<string, string>>('/settings'),
     staleTime: 60_000,
   });
+  const { data: versionInfo } = useQuery({
+    queryKey: ['version'],
+    queryFn: () => api.get<{ version: string }>('/servers/local/version'),
+    staleTime: 300_000,
+  });
+  const { data: ghRelease } = useQuery({
+    queryKey: ['gh-release'],
+    queryFn: async () => {
+      const r = await fetch('https://api.github.com/repos/AlexandreAlan/LiteDock/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!r.ok) return null;
+      return r.json() as Promise<{ tag_name: string } | null>;
+    },
+    staleTime: 3_600_000,
+    retry: false,
+  });
+
+  const currentVersion = versionInfo?.version ?? null;
+  const latestTag = ghRelease?.tag_name ?? null;
+  const hasUpdate = !!(currentVersion && latestTag && semverGt(latestTag.replace(/^v/, ''), currentVersion));
+
   const brandName = settings?.brandName?.trim() || 'LiteDock';
   const brandLogo = settings?.brandLogoUrl?.trim();
 
@@ -68,7 +97,7 @@ export function Layout() {
           <div className="leading-tight">
             <div className="text-sm font-bold text-ink">{brandName}</div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted">
-              <span>v0.9.0</span>
+              {currentVersion && <span>v{currentVersion}</span>}
               <span className="rounded border border-line px-1 text-[10px] leading-tight">PT-BR</span>
             </div>
           </div>
@@ -156,14 +185,16 @@ export function Layout() {
               Sair
             </button>
           </div>
-          <a
-            href="https://github.com/AlexandreAlan/LiteDock/releases"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright"
-          >
-            <Icon name="refresh" className="h-4 w-4" /> Atualização disponível
-          </a>
+          {hasUpdate && (
+            <a
+              href={`https://github.com/AlexandreAlan/LiteDock/releases/tag/${latestTag}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-brand-bright"
+            >
+              <Icon name="refresh" className="h-4 w-4" /> {latestTag} disponível
+            </a>
+          )}
         </div>
       </aside>
 
