@@ -403,6 +403,17 @@ function route(method: string, path: string, body: any): unknown {
     if (!p) throw new DemoError(404, 'Projeto não encontrado');
     return projectView(p);
   }
+  if (parts[0] === 'projects' && parts[1] && parts.length === 2 && M === 'PATCH') {
+    const p = store.projects.find((x) => x.id === parts[1]);
+    if (!p) throw new DemoError(404, 'Projeto não encontrado');
+    if (body?.name) p.name = body.name as string;
+    return projectView(p);
+  }
+  if (parts[0] === 'projects' && parts[1] && parts.length === 2 && M === 'DELETE') {
+    store.projects = store.projects.filter((x) => x.id !== parts[1]);
+    store.services = store.services.filter((x) => x.projectId !== parts[1]);
+    return { ok: true };
+  }
   // pontes de rede (demo): isolado por padrão, sem pontes
   if (parts[0] === 'projects' && parts[1] && parts[2] === 'bridges') {
     if (M === 'GET') return { connected: [], available: store.projects.filter((x) => x.id !== parts[1]).map((x) => ({ id: x.id, name: x.name, slug: x.slug })) };
@@ -472,6 +483,7 @@ function route(method: string, path: string, body: any): unknown {
   }
   if (parts[0] === 'servers' && parts[2] === 'containers' && parts[4] === 'schedule') {
     const name = decodeURIComponent(parts[3]);
+    if (M === 'GET') return schedules.get(name) ?? { containerName: name, startTime: null, stopTime: null, enabled: false };
     if (M === 'PUT') { schedules.set(name, { startTime: body?.startTime ?? null, stopTime: body?.stopTime ?? null, enabled: !!body?.enabled }); return { ok: true }; }
     if (M === 'DELETE') { schedules.delete(name); return { ok: true }; }
   }
@@ -482,7 +494,11 @@ function route(method: string, path: string, body: any): unknown {
     if (!s) throw new DemoError(404, 'Serviço não encontrado');
 
     if (parts.length === 2 && M === 'GET') return serviceFull(s);
-    if (parts.length === 2 && M === 'PATCH') { s.spec = { ...s.spec, ...(body?.spec || {}) }; return serviceLite(s); }
+    if (parts.length === 2 && M === 'PATCH') {
+      if (body?.name) s.name = body.name as string;
+      if (body?.spec) s.spec = { ...s.spec, ...body.spec };
+      return serviceLite(s);
+    }
     if (parts.length === 2 && M === 'DELETE') { store.services = store.services.filter((x) => x.id !== s.id); return { ok: true }; }
 
     // Histórico de métricas fictício (série ondulada) p/ a aba Métricas da demo.
