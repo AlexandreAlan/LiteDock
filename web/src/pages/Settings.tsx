@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import { api, type HostMetrics, type EngineInfo, type DomainFull, type User } from '../lib/api';
@@ -571,7 +572,7 @@ function MonitoringSection() {
           <MetricBox label="Disco" value={`${Math.round(m?.disk.pct ?? 0)}%`} />
           <MetricBox label="Cores" value={`${m?.cpu.cores ?? '—'}`} />
         </div>
-        <a href="/monitor" className="btn-brand mt-4 inline-flex">Abrir monitor completo</a>
+        <Link to="/monitor" className="btn-brand mt-4 inline-flex">Abrir monitor completo</Link>
       </Card>
     </div>
   );
