@@ -76,6 +76,11 @@ export default async function serverRoutes(app: FastifyInstance) {
   });
 
   // Agendamento diário (liga/desliga por horário) por container.
+  app.get('/local/containers/:name/schedule', async (req) => {
+    const { name } = req.params as { name: string };
+    const sched = await prisma.containerSchedule.findUnique({ where: { containerName: name } });
+    return sched ?? { containerName: name, startTime: null, stopTime: null, enabled: false };
+  });
   app.put('/local/containers/:name/schedule', async (req, reply) => {
     const { name } = req.params as { name: string };
     // Só agenda containers do próprio LiteDock — não toca os de produção do host.
