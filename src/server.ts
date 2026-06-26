@@ -14,7 +14,7 @@ import webhookRoutes from './routes/webhooks.js';
 import settingsRoutes from './routes/settings.js';
 import userRoutes from './routes/users.js';
 import githubRoutes from './routes/github.js';
-import { reconcileInterruptedDeploys } from './services/deploy.js';
+import { reconcileInterruptedDeploys, syncContainerStatuses } from './services/deploy.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -95,6 +95,8 @@ const start = async () => {
     await reconcileInterruptedDeploys('API iniciando (reconciliação de boot)').catch((e) => app.log.error(e));
     await app.listen({ port: config.port, host: '127.0.0.1' });
     app.log.info(`LiteDock API no ar em http://127.0.0.1:${config.port}`);
+    // Sincroniza status dos containers a cada 30s — mantém a lista de projetos precisa.
+    setInterval(() => { syncContainerStatuses().catch(() => {}); }, 30_000);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
