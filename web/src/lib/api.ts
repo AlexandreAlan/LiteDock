@@ -205,6 +205,8 @@ export interface TemplateCard {
   website?: string;
   serviceCount: number;
   images: string[];
+  hasCredentials?: boolean;
+  defaultCredentials?: { user: string; password: string; note?: string };
 }
 export interface TemplateCatalog {
   categories: string[];
