@@ -46,6 +46,7 @@ model Project {
   bridgesB  ProjectBridge[] @relation("BridgeB")
 
   @@unique([ownerId, slug])
+  @@index([ownerId])
 }
 
 // Ponte de rede entre dois projetos (isolamento é o padrão; a ponte é opt-in).
@@ -81,6 +82,9 @@ model Service {
   backups     Backup[]
 
   @@unique([projectId, name])
+  @@index([projectId])
+  @@index([serverId])
+  @@index([status])
 }
 
 model EnvVar {
@@ -92,6 +96,7 @@ model EnvVar {
   isSecret  Boolean @default(true)
 
   @@unique([serviceId, key])
+  @@index([serviceId])
 }
 
 model Domain {
@@ -103,6 +108,8 @@ model Domain {
   https      Boolean  @default(true)
   certStatus String   @default("pending") // pending|active|error
   createdAt  DateTime @default(now())
+
+  @@index([serviceId])
 }
 
 model Deployment {
@@ -116,6 +123,9 @@ model Deployment {
   log        String?
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
+
+  @@index([serviceId, startedAt(sort: Desc)])
+  @@index([status])
 }
 
 model Credential {
@@ -126,6 +136,8 @@ model Credential {
   name      String
   token     String // cifrado
   createdAt DateTime @default(now())
+
+  @@index([ownerId])
 }
 
 // Agendamento de liga/desliga de um container do host (diário, hora local).
@@ -147,6 +159,8 @@ model Backup {
   location  String?
   sizeBytes BigInt?
   createdAt DateTime @default(now())
+
+  @@index([serviceId])
 }
 
 // Configurações gerais do painel (chave-valor). Ex.: domínio do painel,
