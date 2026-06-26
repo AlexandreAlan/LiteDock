@@ -544,7 +544,7 @@ function DomainsTab({ s }: { s: ServiceFull }) {
 // ── Deployments (com deploy ao vivo) ────────────────────────────────────
 function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?: Deployment; onRedeploy: () => void; deploying: boolean }) {
   const [expandedDep, setExpandedDep] = useState<string | null>(null);
-  const [logRef] = [useRef<HTMLPreElement>(null)];
+  const logRef = useRef<HTMLPreElement>(null);
   const [skip, setSkip] = useState(0);
   const PAGE = 10;
   const moreQ = useQuery({
@@ -761,11 +761,17 @@ function ScheduleCard({ containerName }: { containerName: string }) {
 
 // ── Advanced (webhook + danger zone) ────────────────────────────────────
 function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: () => void; destroying: boolean }) {
+  const navigate = useNavigate();
   const [webhook, setWebhook] = useState<string | null>(null);
   const [confirm, setConfirm] = useState('');
   const gen = useMutation({
     mutationFn: () => api.post<WebhookInfo>(`/services/${s.id}/webhook`),
     onSuccess: (r) => { setWebhook(r.url); toast.success('URL do webhook gerada.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
+  });
+  const duplicate = useMutation({
+    mutationFn: () => api.post<{ id: string }>(`/services/${s.id}/duplicate`),
+    onSuccess: (copy) => { toast.success('Serviço duplicado.'); navigate(`/service/${copy.id}`); },
     onError: (e: unknown) => toast.error((e as Error).message),
   });
   return (
@@ -786,6 +792,18 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
       {s.containerId && <ScheduleCard containerName={s.containerId} />}
 
       <LimitsCard s={s} />
+
+      <Card title="Duplicar serviço" subtitle="Cria uma cópia do serviço com o mesmo spec e variáveis de ambiente no mesmo projeto.">
+        <p className="mb-3 text-sm text-muted">O serviço duplicado fica parado — configure a origem e faça deploy para iniciá-lo.</p>
+        <button
+          className="btn-ghost text-sm"
+          disabled={duplicate.isPending}
+          onClick={() => duplicate.mutate()}
+        >
+          {duplicate.isPending ? 'Duplicando…' : <><Icon name="copy" className="h-4 w-4" /> Duplicar serviço</>}
+        </button>
+        {duplicate.error && <div className="mt-2"><ErrorNote message={(duplicate.error as Error).message} /></div>}
+      </Card>
 
       <Card title="Zona de perigo">
         <p className="mb-3 text-sm text-muted">Remover o serviço apaga o container e todo o registro. Não tem volta.</p>
