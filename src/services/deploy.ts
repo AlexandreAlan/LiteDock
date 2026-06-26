@@ -197,6 +197,12 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     ? await prisma.deployment.update({ where: { id: deploymentId }, data: { status: 'building', imageTag: spec.image } })
     : await prisma.deployment.create({ data: { serviceId, status: 'building', trigger: 'manual', imageTag: spec.image } });
   const logs: string[] = [];
+  // Salva o log incremental no banco a cada 2s durante o build, para que o
+  // frontend (polling 1.5s) exiba progresso em tempo real — não só no final.
+  let flushTimer: ReturnType<typeof setInterval> | null = setInterval(async () => {
+    if (logs.length) await prisma.deployment.update({ where: { id: dep.id }, data: { log: logs.join('\n') } }).catch(() => {});
+  }, 2000);
+  const stopFlush = () => { if (flushTimer) { clearInterval(flushTimer); flushTimer = null; } };
   const log = (l: string) => { logs.push(l); onLog(l); };
 
   try {
@@ -334,6 +340,7 @@ export async function deployService(serviceId: string, deploymentId?: string, on
       });
     }
 
+    stopFlush();
     const finished = await prisma.deployment.update({
       where: { id: dep.id },
       data: { status: 'success', log: logs.join('\n'), finishedAt: new Date() },
@@ -342,6 +349,7 @@ export async function deployService(serviceId: string, deploymentId?: string, on
     const url = hosts[0] ? `${tls ? 'https' : 'http'}://${hosts[0]}` : null;
     return { deployment: finished, url, container: name };
   } catch (e) {
+    stopFlush();
     const msg = (e as Error).message;
     await prisma.service.update({ where: { id: serviceId }, data: { status: 'error' } }).catch(() => {});
     await prisma.deployment.update({
