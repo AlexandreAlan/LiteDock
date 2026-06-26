@@ -8,6 +8,7 @@
 [![Node 20+](https://img.shields.io/badge/node-20+-10b981?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/docker-required-2496ed?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
 [![Demo](https://img.shields.io/badge/demo-ao%20vivo-10b981?style=flat-square)](https://demo.litedock.morenadoaco.com.br)
+[![PRs Welcome](https://img.shields.io/badge/PRs-bem--vindos-10b981?style=flat-square)](CONTRIBUTING.md)
 
 LiteDock é um painel open-source de gerenciamento de servidores inspirado no EasyPanel,
 construído do zero com foco em **simplicidade**, **segurança** e **PT-BR**.
@@ -114,15 +115,17 @@ Acesse `http://localhost:8088` — crie sua conta na primeira vez.
 
 ## Variáveis de ambiente
 
+Copie `.env.example` para `.env` e preencha:
+
 | Variável | Descrição |
 |---|---|
 | `DATABASE_URL` | `postgres://user:pass@host:5432/litedock` |
 | `REDIS_URL` | `redis://localhost:6379` |
-| `JWT_SECRET` | Segredo aleatório (mín. 32 chars) |
-| `LITEDOCK_SERVICES_DOMAIN` | Domínio base dos serviços (ex: `apps.seudominio.com`) |
+| `JWT_SECRET` | Segredo aleatório (mín. 32 chars — `openssl rand -hex 32`) |
+| `ENCRYPTION_KEY` | Chave para AES-256-GCM (`openssl rand -hex 32`) |
 | `PORT` | Porta da API (padrão: `8088`) |
-| `LITEDOCK_DEFAULT_MEM_MB` | RAM padrão por container em MB (padrão: `1024`) |
-| `LITEDOCK_DEFAULT_CPUS` | vCPUs padrão por container (padrão: `1`) |
+| `PUBLIC_URL` | URL pública do painel com `/api` (ex: `https://painel.meudominio.com/api`) |
+| `LITEDOCK_DOCKER_PROXY` | Endereço do docker-socket-proxy (padrão: `127.0.0.1:2375`) |
 
 ---
 
@@ -140,7 +143,8 @@ Acesse `http://localhost:8088` — crie sua conta na primeira vez.
 
 ## Contribuindo
 
-PRs são bem-vindos! Abra uma issue antes de codar algo grande para alinhar a direção.
+PRs são bem-vindos! Leia o [**CONTRIBUTING.md**](CONTRIBUTING.md) para o guia completo de setup e padrões.
+Encontrou uma vulnerabilidade? Veja a [**política de segurança**](SECURITY.md) — não abra issue pública.
 
 1. Fork → branch → commits atômicos
 2. `npm run build` no frontend sem erros de TypeScript
