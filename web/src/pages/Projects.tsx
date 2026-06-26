@@ -87,7 +87,15 @@ export function Projects() {
                   <Link to={`/project/${p.id}`} title="Adicionar serviço" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="plus" className="h-4 w-4" /></Link>
                   <Link to={`/project/${p.id}`} title="Layout" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="layout" className="h-4 w-4" /></Link>
                 </div>
-                <span className="ml-1 text-xs text-muted">{p.services?.length ?? 0} serviços</span>
+                <span className="ml-1 text-xs text-muted">
+                  {(() => {
+                    const total = p.services?.length ?? 0;
+                    const running = (p.services ?? []).filter((s) => s.status === 'running' || s.status === 'online').length;
+                    if (total === 0) return '0 serviços';
+                    if (running > 0) return <><span className="text-ok font-semibold">{running}</span>/{total} rodando</>;
+                    return `${total} serviço${total !== 1 ? 's' : ''}`;
+                  })()}
+                </span>
               </div>
 
               {/* cards de serviço */}
