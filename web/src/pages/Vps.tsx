@@ -223,7 +223,7 @@ function ServicesTab() {
           </table>
         </div>
       )}
-      {action.error && <div className="mt-3"><ErrorNote message={(action.error as Error).message} /></div>}
+      {action.error instanceof Error && <div className="mt-3"><ErrorNote message={action.error.message} /></div>}
       {sched && <ScheduleModal container={sched} onClose={() => setSched(null)} />}
     </Card>
   );
@@ -274,7 +274,7 @@ function ScheduleModal({ container, onClose }: { container: ContainerStat; onClo
           <input type="time" className="field" value={stop} onChange={(e) => setStop(e.target.value)} />
         </div>
       </div>
-      {(save.error || clear.error) && <div className="mt-3"><ErrorNote message={((save.error || clear.error) as Error).message} /></div>}
+      {!!(save.error || clear.error) && <div className="mt-3"><ErrorNote message={((save.error || clear.error) as Error).message} /></div>}
     </Modal>
   );
 }
