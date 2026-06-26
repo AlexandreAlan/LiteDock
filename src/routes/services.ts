@@ -172,6 +172,22 @@ export default async function serviceRoutes(app: FastifyInstance) {
     return { url: `${base}/webhooks/services/${id}/deploy?token=${token}` };
   });
 
+  // Lista deployments paginados (skip/take) — suporta "carregar mais" no frontend.
+  app.get('/:id/deployments', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { skip = '0', take = '10' } = req.query as { skip?: string; take?: string };
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const list = await prisma.deployment.findMany({
+      where: { serviceId: id },
+      orderBy: { startedAt: 'desc' },
+      skip: Math.max(0, Number(skip)),
+      take: Math.min(50, Math.max(1, Number(take))),
+    });
+    const total = await prisma.deployment.count({ where: { serviceId: id } });
+    return { deployments: list, total };
+  });
+
   // Status de um deployment (polling do frontend durante o deploy).
   app.get('/:id/deployments/:depId', async (req, reply) => {
     const { id, depId } = req.params as { id: string; depId: string };
