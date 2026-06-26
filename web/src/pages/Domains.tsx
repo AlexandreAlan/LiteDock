@@ -1,21 +1,67 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { api, type DomainFull } from '../lib/api';
 import { Card } from '../components/Card';
+import { Icon } from '../components/icons';
 import { Spinner, Empty, ErrorNote } from '../components/ui';
+
+function certColor(d: DomainFull) {
+  if (!d.https) return 'text-muted';
+  if (d.certStatus === 'active') return 'text-ok';
+  if (d.certStatus === 'error') return 'text-bad';
+  return 'text-warn';
+}
+
+function certLabel(d: DomainFull) {
+  if (!d.https) return 'HTTP';
+  if (d.certStatus === 'active') return 'SSL ativo';
+  if (d.certStatus === 'error') return 'SSL erro';
+  return d.certStatus ?? 'pendente';
+}
 
 export function Domains() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['domains'],
     queryFn: () => api.get<DomainFull[]>('/domains'),
+    refetchInterval: 30000,
   });
+  const [search, setSearch] = useState('');
   const domains = data ?? [];
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return domains;
+    return domains.filter(
+      (d) =>
+        d.host.toLowerCase().includes(q) ||
+        d.service?.name.toLowerCase().includes(q) ||
+        d.service?.project?.name.toLowerCase().includes(q),
+    );
+  }, [domains, search]);
+
+  const httpsDomains = domains.filter((d) => d.https).length;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Domínios</h1>
-        <p className="label mt-1">Todos os domínios dos seus serviços</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1">
+          <h1 className="text-2xl font-semibold text-ink">Domínios</h1>
+          <p className="label mt-1">
+            {domains.length} domínio{domains.length !== 1 ? 's' : ''}{domains.length > 0 && ` · ${httpsDomains} com HTTPS`}
+          </p>
+        </div>
+        {domains.length > 0 && (
+          <div className="relative w-full sm:w-72">
+            <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              className="field pl-8 text-sm"
+              placeholder="Buscar domínio ou serviço…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -24,26 +70,36 @@ export function Domains() {
         <ErrorNote message={(error as Error).message} />
       ) : domains.length === 0 ? (
         <Empty title="Nenhum domínio" hint="Adicione domínios na página de cada serviço." />
+      ) : filtered.length === 0 ? (
+        <Empty title={`Sem resultados para "${search}"`} hint="Tente outro termo." />
       ) : (
-        <Card title={`${domains.length} domínio(s)`}>
+        <Card title={`${filtered.length} de ${domains.length} domínio(s)`}>
           <ul className="divide-y divide-line">
-            {domains.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-3">
+            {filtered.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <a href={`${d.https ? 'https' : 'http'}://${d.host}`} target="_blank" rel="noreferrer" className="font-medium text-ink hover:text-brand">
+                  <a
+                    href={`${d.https ? 'https' : 'http'}://${d.host}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 font-medium text-ink hover:text-brand"
+                  >
+                    <Icon name="globe" className="h-4 w-4 shrink-0 text-muted" />
                     {d.https ? 'https://' : 'http://'}{d.host}
+                    <Icon name="externalLink" className="h-3 w-3 text-muted" />
                   </a>
-                  <div className="mt-0.5 text-xs text-muted">
+                  <div className="mt-0.5 flex items-center gap-2 pl-5 text-xs text-muted">
                     {d.service?.project && (
                       <Link to={`/service/${d.service.id}`} className="hover:text-ink">
                         {d.service.project.name} / {d.service.name}
                       </Link>
                     )}
-                    {' · porta '}{d.targetPort}
+                    <span>porta {d.targetPort}</span>
                   </div>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${d.certStatus === 'active' ? 'bg-brand/10 text-brand-ink' : 'bg-panel2 text-muted'}`}>
-                  {d.certStatus}
+                <span className={`flex items-center gap-1.5 text-xs font-medium ${certColor(d)}`}>
+                  <Icon name="shield" className="h-3.5 w-3.5" />
+                  {certLabel(d)}
                 </span>
               </li>
             ))}
