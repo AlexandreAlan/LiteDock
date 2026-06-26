@@ -28,6 +28,7 @@ type Tab = 'source' | 'env' | 'credentials' | 'domains' | 'deploys' | 'metrics' 
 
 // Mapa de imagem → variável de senha que controla o acesso.
 const CRED_MAP: Record<string, { var: string; user?: string; label: string }> = {
+  'lscr.io/linuxserver/openvscode-server': { var: 'PASSWORD', label: 'Senha do VS Code Server' },
   'codercom/code-server':   { var: 'PASSWORD',        label: 'Senha do code-server' },
   'dpage/pgadmin4':         { var: 'PGADMIN_DEFAULT_PASSWORD', user: 'PGADMIN_DEFAULT_EMAIL', label: 'Senha do pgAdmin' },
   'grafana/grafana':        { var: 'GF_SECURITY_ADMIN_PASSWORD', label: 'Senha admin do Grafana' },
