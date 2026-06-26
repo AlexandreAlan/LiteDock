@@ -21,6 +21,7 @@ export interface Template {
   logo: string; // URL do logotipo oficial
   website?: string;
   variables?: string[]; // gerados como senha forte por instalação
+  defaultCredentials?: { user: string; password: string; note?: string }; // creds padrão fixas do app
   services: TemplateService[];
 }
 
@@ -90,7 +91,7 @@ export const TEMPLATES: Template[] = [
   { slug: 'metabase', name: 'Metabase', description: 'BI e dashboards simples.', category: 'Analytics & BI', logo: ic('metabase'), website: 'https://www.metabase.com', services: [app('metabase/metabase:latest', [3000], ['/metabase-data'])] },
   { slug: 'umami', name: 'Umami', description: 'Analytics de site leve e privado.', category: 'Analytics & BI', logo: ic('umami'), website: 'https://umami.is', variables: ['DB_PASSWORD', 'APP_SECRET'], services: [app('ghcr.io/umami-software/umami:postgresql-latest', [3000], [], { DATABASE_URL: 'postgresql://umami:${DB_PASSWORD}@${slug}-db:5432/umami', DATABASE_TYPE: 'postgresql', APP_SECRET: '${APP_SECRET}' }), db('postgres:16', [5432], ['/var/lib/postgresql/data'], { POSTGRES_USER: 'umami', POSTGRES_PASSWORD: '${DB_PASSWORD}', POSTGRES_DB: 'umami' })] },
   { slug: 'matomo', name: 'Matomo', description: 'Analytics web (alternativa ao GA).', category: 'Analytics & BI', logo: ic('matomo'), website: 'https://matomo.org', variables: ['DB_PASSWORD'], services: [app('matomo:latest', [80], ['/var/www/html'], { MATOMO_DATABASE_HOST: '${slug}-db', MATOMO_DATABASE_USERNAME: 'matomo', MATOMO_DATABASE_PASSWORD: '${DB_PASSWORD}', MATOMO_DATABASE_DBNAME: 'matomo' }), db('mariadb:11', [3306], ['/var/lib/mysql'], { MARIADB_DATABASE: 'matomo', MARIADB_USER: 'matomo', MARIADB_PASSWORD: '${DB_PASSWORD}', MARIADB_ROOT_PASSWORD: '${DB_PASSWORD}' })] },
-  { slug: 'grafana', name: 'Grafana', description: 'Dashboards e visualização de métricas.', category: 'Analytics & BI', logo: ic('grafana'), website: 'https://grafana.com', services: [app('grafana/grafana:latest', [3000], ['/var/lib/grafana'])] },
+  { slug: 'grafana', name: 'Grafana', description: 'Dashboards e visualização de métricas.', category: 'Analytics & BI', logo: ic('grafana'), website: 'https://grafana.com', defaultCredentials: { user: 'admin', password: 'admin', note: 'Troque a senha no primeiro login.' }, services: [app('grafana/grafana:latest', [3000], ['/var/lib/grafana'])] },
   { slug: 'plausible', name: 'Plausible', description: 'Analytics web simples e sem cookies.', category: 'Analytics & BI', logo: ic('plausible'), website: 'https://plausible.io', services: [app('ghcr.io/plausible/community-edition:latest', [8000], [])] },
 
   // ── Monitoramento ───────────────────────────────────────────
@@ -107,7 +108,7 @@ export const TEMPLATES: Template[] = [
   // ── Dev & Git ───────────────────────────────────────────────
   { slug: 'gitea', name: 'Gitea', description: 'Git self-hosted leve.', category: 'Dev & Git', logo: ic('gitea'), website: 'https://gitea.io', services: [app('gitea/gitea:latest', [3000, 22], ['/data'])] },
   { slug: 'forgejo', name: 'Forgejo', description: 'Fork comunitário do Gitea.', category: 'Dev & Git', logo: ic('forgejo'), website: 'https://forgejo.org', services: [app('codeberg.org/forgejo/forgejo:7', [3000, 22], ['/data'])] },
-  { slug: 'code-server', name: 'code-server', description: 'VS Code no navegador.', category: 'Dev & Git', logo: ic('vscode'), website: 'https://github.com/coder/code-server', services: [app('codercom/code-server:latest', [8080], ['/home/coder'])] },
+  { slug: 'code-server', name: 'code-server', description: 'VS Code no navegador.', category: 'Dev & Git', logo: ic('vscode'), website: 'https://github.com/coder/code-server', variables: ['PASSWORD'], services: [app('codercom/code-server:latest', [8080], ['/home/coder'], { PASSWORD: '${PASSWORD}' })] },
   { slug: 'verdaccio', name: 'Verdaccio', description: 'Registro NPM privado.', category: 'Dev & Git', logo: ic('verdaccio'), website: 'https://verdaccio.org', services: [app('verdaccio/verdaccio:latest', [4873], ['/verdaccio/storage'])] },
   { slug: 'registry', name: 'Docker Registry', description: 'Registro de imagens Docker privado.', category: 'Dev & Git', logo: ic('docker'), website: 'https://docs.docker.com/registry', services: [app('registry:2', [5000], ['/var/lib/registry'])] },
   { slug: 'sonarqube', name: 'SonarQube', description: 'Análise de qualidade de código.', category: 'Dev & Git', logo: ic('sonarqube'), website: 'https://www.sonarsource.com', services: [app('sonarqube:community', [9000], ['/opt/sonarqube/data'])] },
@@ -131,7 +132,7 @@ export const TEMPLATES: Template[] = [
 
   // ── Produtividade & Cloud ───────────────────────────────────
   { slug: 'nextcloud', name: 'Nextcloud', description: 'Sua nuvem privada (arquivos, fotos, apps).', category: 'Produtividade & Cloud', logo: ic('nextcloud'), website: 'https://nextcloud.com', variables: ['DB_PASSWORD'], services: [app('nextcloud:latest', [80], ['/var/www/html'], { POSTGRES_HOST: '${slug}-db', POSTGRES_DB: 'nextcloud', POSTGRES_USER: 'nextcloud', POSTGRES_PASSWORD: '${DB_PASSWORD}' }), db('postgres:16', [5432], ['/var/lib/postgresql/data'], { POSTGRES_DB: 'nextcloud', POSTGRES_USER: 'nextcloud', POSTGRES_PASSWORD: '${DB_PASSWORD}' })] },
-  { slug: 'filebrowser', name: 'File Browser', description: 'Gerenciador de arquivos web.', category: 'Produtividade & Cloud', logo: ic('filebrowser'), website: 'https://filebrowser.org', services: [app('filebrowser/filebrowser:latest', [80], ['/srv'])] },
+  { slug: 'filebrowser', name: 'File Browser', description: 'Gerenciador de arquivos web.', category: 'Produtividade & Cloud', logo: ic('filebrowser'), website: 'https://filebrowser.org', defaultCredentials: { user: 'admin', password: 'admin', note: 'Troque a senha no primeiro login.' }, services: [app('filebrowser/filebrowser:latest', [80], ['/srv'])] },
   { slug: 'syncthing', name: 'Syncthing', description: 'Sincronização de arquivos P2P.', category: 'Produtividade & Cloud', logo: ic('syncthing'), website: 'https://syncthing.net', services: [app('syncthing/syncthing:latest', [8384], ['/var/syncthing'])] },
   { slug: 'trilium', name: 'Trilium Notes', description: 'Notas hierárquicas poderosas.', category: 'Produtividade & Cloud', logo: ic('trilium'), website: 'https://github.com/zadam/trilium', services: [app('zadam/trilium:latest', [8080], ['/home/node/trilium-data'])] },
   { slug: 'vikunja', name: 'Vikunja', description: 'Lista de tarefas e gestão de projetos.', category: 'Produtividade & Cloud', logo: ic('vikunja'), website: 'https://vikunja.io', services: [app('vikunja/vikunja:latest', [3456], ['/app/vikunja/files'])] },
@@ -186,6 +187,8 @@ export function listTemplates() {
     website: t.website,
     serviceCount: t.services.length,
     images: t.services.map((s) => s.image),
+    hasCredentials: !!(t.variables?.length || t.defaultCredentials),
+    defaultCredentials: t.defaultCredentials,
   }));
 }
 
