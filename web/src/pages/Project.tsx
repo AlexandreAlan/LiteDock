@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project as TProject, type Service, type ServiceType } from '../lib/api';
 import { Modal } from '../components/Modal';
@@ -14,6 +14,7 @@ const DB_ENGINES = ['postgres', 'mysql', 'mongo', 'redis'];
 export function Project() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useQuery({
     queryKey: ['project', id],
     queryFn: () => api.get<TProject>(`/projects/${id}`),
@@ -26,6 +27,11 @@ export function Project() {
   const [engine, setEngine] = useState('postgres');
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
+
+  const destroy = useMutation({
+    mutationFn: () => api.del(`/projects/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); navigate('/'); },
+  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -63,6 +69,18 @@ export function Project() {
           <button className="btn-ghost" onClick={() => setNets(true)}><Icon name="globe" className="h-4 w-4" /> Redes</button>
           <button className="btn-ghost" onClick={() => setStore(true)}><Icon name="zap" className="h-4 w-4" /> Templates</button>
           <button className="btn-brand" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Criar serviço</button>
+          <button
+            className="rounded-lg border border-bad/30 p-2 text-muted hover:bg-bad/10 hover:text-bad transition-colors"
+            title="Excluir projeto"
+            onClick={() => {
+              if (confirm(`Excluir o projeto "${project.name}" e todos os seus serviços? Esta ação não tem volta.`)) {
+                destroy.mutate();
+              }
+            }}
+            disabled={destroy.isPending}
+          >
+            <Icon name="trash" className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
