@@ -442,14 +442,42 @@ function EnvTab({ s }: { s: ServiceFull }) {
     }
   }
 
+  async function downloadEnv() {
+    const pairs = await Promise.all(
+      (s.envVars ?? []).map(async (e) => {
+        if (!e.isSecret) return `${e.key}=${e.value}`;
+        try {
+          const r = await api.get<{ value: string }>(`/services/${s.id}/env/${encodeURIComponent(e.key)}/reveal`);
+          return `${e.key}=${r.value}`;
+        } catch {
+          return `${e.key}=`;
+        }
+      }),
+    );
+    const blob = new Blob([pairs.join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${s.name}.env`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success('.env baixado com os valores reais.');
+  }
+
   return (
     <Card
       title="Environment"
       subtitle="Variáveis de ambiente (segredos cifrados AES-256-GCM em repouso)."
       right={
-        <button onClick={() => { setBulk((b) => !b); setBulkErr(''); }} className="btn-ghost text-xs">
-          {bulk ? '✕ Fechar' : 'Importar .env'}
-        </button>
+        <div className="flex items-center gap-2">
+          {(s.envVars?.length ?? 0) > 0 && (
+            <button onClick={downloadEnv} className="btn-ghost text-xs">
+              <Icon name="externalLink" className="h-3.5 w-3.5" /> Exportar .env
+            </button>
+          )}
+          <button onClick={() => { setBulk((b) => !b); setBulkErr(''); }} className="btn-ghost text-xs">
+            {bulk ? '✕ Fechar' : 'Importar .env'}
+          </button>
+        </div>
       }
     >
       {bulk && (
