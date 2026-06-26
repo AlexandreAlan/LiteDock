@@ -81,6 +81,23 @@ export function Projects() {
         </div>
       </div>
 
+      {/* resumo de projetos e serviços */}
+      {data && data.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted">
+          {(() => {
+            const allSvcs = data.flatMap((p) => p.services ?? []);
+            const running = allSvcs.filter((s) => s.status === 'running' || s.status === 'online').length;
+            return (
+              <>
+                <span><span className="font-semibold text-ink">{data.length}</span> projeto{data.length !== 1 ? 's' : ''}</span>
+                <span><span className="font-semibold text-ink">{allSvcs.length}</span> serviço{allSvcs.length !== 1 ? 's' : ''}</span>
+                <span className="text-ok"><span className="font-semibold">{running}</span> rodando</span>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {isLoading ? (
         <Spinner />
       ) : error ? (
