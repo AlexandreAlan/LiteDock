@@ -7,6 +7,7 @@ import { Card } from '../components/Card';
 import { Empty, ErrorNote, Spinner } from '../components/ui';
 import { Icon } from '../components/icons';
 import { useAuth } from '../lib/auth';
+import { toast } from '../lib/toast';
 
 type IconName = Parameters<typeof Icon>[0]['name'];
 type TabKey =
@@ -481,6 +482,7 @@ function UsuariosSection() {
       await api.post('/users', { email, name: name || undefined, password, role });
       setEmail(''); setName(''); setPassword(''); setRole('member');
       qc.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Usuário criado.');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Falha ao criar');
     } finally {
@@ -488,16 +490,22 @@ function UsuariosSection() {
     }
   }
   async function changeRole(id: string, r: string) {
-    await api.patch(`/users/${id}`, { role: r });
-    qc.invalidateQueries({ queryKey: ['users'] });
+    try {
+      await api.patch(`/users/${id}`, { role: r });
+      qc.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Papel atualizado.');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao atualizar papel');
+    }
   }
   async function remove(id: string, em: string) {
     if (!confirm(`Excluir o usuário ${em}?`)) return;
     try {
       await api.del(`/users/${id}`);
       qc.invalidateQueries({ queryKey: ['users'] });
+      toast.success(`Usuário ${em} removido.`);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Falha ao excluir');
+      toast.error(e instanceof Error ? e.message : 'Falha ao excluir');
     }
   }
 
@@ -682,6 +690,7 @@ function GithubSection() {
       setToken('');
       qc.invalidateQueries({ queryKey: ['github-status'] });
       qc.invalidateQueries({ queryKey: ['github-repos'] });
+      toast.success('GitHub conectado com sucesso.');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Falha ao conectar');
     } finally {
@@ -690,8 +699,13 @@ function GithubSection() {
   }
   async function disconnect() {
     if (!confirm('Desconectar a conta do GitHub?')) return;
-    await api.del('/github/disconnect');
-    qc.invalidateQueries({ queryKey: ['github-status'] });
+    try {
+      await api.del('/github/disconnect');
+      qc.invalidateQueries({ queryKey: ['github-status'] });
+      toast.success('GitHub desconectado.');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao desconectar');
+    }
   }
 
   if (isLoading) return <Card title="Github"><Spinner /></Card>;
