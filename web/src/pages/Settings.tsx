@@ -837,14 +837,20 @@ function NotificacoesSection() {
 }
 
 function LicencaSection() {
+  const { data: versionInfo } = useQuery({
+    queryKey: ['version'],
+    queryFn: () => api.get<{ version: string }>('/servers/local/version'),
+    staleTime: 300_000,
+  });
   return (
     <div className="space-y-6">
       <Card title="Licença">
         <div className="space-y-2.5 text-sm">
           <Row k="Edição" v="Self-hosted" />
           <Row k="Plano" v="Ilimitado (sem limite de apps)" />
-          <Row k="Versão" v="LiteDock v0.9.0" />
+          <Row k="Versão" v={versionInfo ? `LiteDock v${versionInfo.version}` : '…'} />
           <Row k="Status" v={<span className="text-ok">Ativa</span>} />
+          <Row k="Repositório" v={<a href="https://github.com/AlexandreAlan/LiteDock" target="_blank" rel="noreferrer" className="text-brand hover:underline">github.com/AlexandreAlan/LiteDock</a>} />
         </div>
       </Card>
     </div>
