@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
@@ -425,8 +425,19 @@ function DomainsTab({ s }: { s: ServiceFull }) {
 
 // ── Deployments (com deploy ao vivo) ────────────────────────────────────
 function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?: Deployment; onRedeploy: () => void; deploying: boolean }) {
+  const [expandedDep, setExpandedDep] = useState<string | null>(null);
+  const logRef = useRef<HTMLPreElement>(null);
+
+  // Auto-scroll durante deploy ao vivo.
+  useEffect(() => {
+    if (logRef.current && isInflight(live?.status)) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [live?.log, live?.status]);
+
   const statusColor = (st: string) =>
     st === 'success' ? 'text-ok' : st === 'failed' ? 'text-bad' : 'text-warn';
+
   return (
     <div className="space-y-5">
       {live && (
@@ -436,7 +447,7 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
             {isInflight(live.status) && <Spinner label="" />}
           </div>
           {live.log && (
-            <pre className="max-h-96 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{live.log}</pre>
+            <pre ref={logRef} className="max-h-96 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{live.log}</pre>
           )}
         </Card>
       )}
@@ -447,16 +458,31 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
         {s.deployments && s.deployments.length > 0 ? (
           <ul className="divide-y divide-line">
             {s.deployments.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${d.status === 'success' ? 'bg-ok' : d.status === 'failed' ? 'bg-bad' : 'bg-warn'}`} />
-                  <span className="text-ink">{d.trigger}</span>
-                  {d.imageTag && <span className="font-mono text-xs text-muted">{d.imageTag}</span>}
-                </span>
-                <span className="flex items-center gap-3 text-xs text-muted">
-                  <span>{new Date(d.startedAt).toLocaleString('pt-BR')}</span>
-                  <span className={`rounded bg-panel2 px-2 py-0.5 ${statusColor(d.status)}`}>{d.status}</span>
-                </span>
+              <li key={d.id}>
+                <button
+                  className="flex w-full items-center justify-between py-2 text-sm hover:bg-panel2/50 px-1 rounded transition-colors"
+                  onClick={() => setExpandedDep((prev) => (prev === d.id ? null : d.id))}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`h-1.5 w-1.5 rounded-full ${d.status === 'success' ? 'bg-ok' : d.status === 'failed' ? 'bg-bad' : 'bg-warn'}`} />
+                    <span className="text-ink">{d.trigger}</span>
+                    {d.imageTag && <span className="font-mono text-xs text-muted">{d.imageTag}</span>}
+                  </span>
+                  <span className="flex items-center gap-3 text-xs text-muted">
+                    <span>{new Date(d.startedAt).toLocaleString('pt-BR')}</span>
+                    <span className={`rounded bg-panel2 px-2 py-0.5 ${statusColor(d.status)}`}>{d.status}</span>
+                    <Icon name="chevronDown" className={`h-3.5 w-3.5 transition-transform ${expandedDep === d.id ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+                {expandedDep === d.id && (
+                  <div className="pb-3 pt-1">
+                    {d.log ? (
+                      <pre className="max-h-72 overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{d.log}</pre>
+                    ) : (
+                      <p className="px-1 text-xs text-muted">Sem log registrado para este deploy.</p>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -471,6 +497,7 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
 // ── Logs ────────────────────────────────────────────────────────────────
 function LogsTab({ id }: { id: string }) {
   const [auto, setAuto] = useState(true);
+  const logRef = useRef<HTMLPreElement>(null);
   const logs = useQuery({
     queryKey: ['service-logs', id],
     queryFn: () => api.get<{ logs?: string } | string>(`/services/${id}/logs?tail=400`),
@@ -478,6 +505,14 @@ function LogsTab({ id }: { id: string }) {
     retry: false,
   });
   const text = typeof logs.data === 'string' ? logs.data : logs.data?.logs;
+
+  // Auto-scroll para a última linha quando a atualização automática está ligada.
+  useEffect(() => {
+    if (logRef.current && auto) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [text, auto]);
+
   return (
     <Card title="Logs" subtitle="Saída do container (stdout/stderr).">
       <div className="mb-3 flex items-center gap-3">
@@ -487,7 +522,7 @@ function LogsTab({ id }: { id: string }) {
         <button onClick={() => logs.refetch()} className="btn-ghost text-xs">Atualizar agora</button>
       </div>
       {logs.isLoading ? <Spinner /> : logs.error ? <ErrorNote message={(logs.error as Error).message} /> : text ? (
-        <pre className="max-h-[28rem] overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{text}</pre>
+        <pre ref={logRef} className="max-h-[28rem] overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{text}</pre>
       ) : (
         <Empty title="Sem logs" hint="Este serviço ainda não produziu saída." />
       )}
