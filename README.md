@@ -4,6 +4,7 @@
 
 **Deploy apps com Docker em 30 segundos — sem configurar nada manualmente.**
 
+[![CI](https://img.shields.io/github/actions/workflow/status/AlexandreAlan/LiteDock/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/AlexandreAlan/LiteDock/actions)
 [![MIT License](https://img.shields.io/badge/licença-MIT-10b981?style=flat-square)](LICENSE)
 [![Node 20+](https://img.shields.io/badge/node-20+-10b981?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/docker-required-2496ed?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
@@ -65,6 +66,7 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 | **Histórico de deploys** | Paginado (anterior/próximo) com contagem total |
 | **Status ao vivo** | Backend sincroniza status dos containers com Docker a cada 30s |
 | **Rate limiting** | Proteção brute-force no login (10 tentativas/min por IP) |
+| **Gerenciamento de usuários** | Painel completo para criar, editar papel/senha e remover contas (owner/admin) |
 
 ---
 
@@ -156,8 +158,8 @@ Copie `.env.example` para `.env` e preencha:
 PRs são bem-vindos! Leia o [**CONTRIBUTING.md**](CONTRIBUTING.md) para o guia completo de setup e padrões.
 Encontrou uma vulnerabilidade? Veja a [**política de segurança**](SECURITY.md) — não abra issue pública.
 
-1. Fork → branch → commits atômicos
-2. `npm run build` no frontend sem erros de TypeScript
+1. Fork → branch → commits atômicos (1 arquivo por commit)
+2. `npm run typecheck` na raiz + `cd web && npm run typecheck && npm run build`
 3. Descreva o *porquê* da mudança no PR
 
 ---
