@@ -6,6 +6,7 @@
     "dev": "vite",
     "dev:demo": "VITE_DEMO=1 vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "build:demo": "VITE_DEMO=1 vite build",
     "preview": "vite preview"
   },
