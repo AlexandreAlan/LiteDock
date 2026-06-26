@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from '../lib/toast';
 import { api, type ContainerStat, type DockerEvent, type StorageItem } from '../lib/api';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
@@ -75,6 +76,8 @@ function ServicesTab() {
     mutationFn: ({ name, op }: { name: string; op: 'start' | 'stop' }) =>
       api.post(`/servers/local/containers/${encodeURIComponent(name)}/${op}`),
     onMutate: ({ name }) => setBusy(name),
+    onSuccess: (_d, { op }) => toast.success(`Container ${op === 'start' ? 'iniciado' : 'parado'}.`),
+    onError: (e: unknown) => toast.error((e as Error).message),
     onSettled: () => { setBusy(null); qc.invalidateQueries({ queryKey: ['container-stats'] }); },
   });
 
@@ -221,11 +224,13 @@ function ScheduleModal({ container, onClose }: { container: ContainerStat; onClo
         stopTime: stop || null,
         enabled: true,
       }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['container-stats'] }); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['container-stats'] }); toast.success('Agendamento salvo.'); onClose(); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const clear = useMutation({
     mutationFn: () => api.del(`/servers/local/containers/${encodeURIComponent(container.name)}/schedule`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['container-stats'] }); onClose(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['container-stats'] }); toast.success('Agendamento removido.'); onClose(); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   return (
