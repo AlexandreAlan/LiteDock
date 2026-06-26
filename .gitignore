@@ -1,5 +1,6 @@
 node_modules/
 .env
+.env.bak-*
 dist/
 *.log
 .DS_Store
@@ -8,6 +9,9 @@ dist/
 .venv/
 __pycache__/
 *.pyc
+
+# Backups automáticos
+*.bak-*
 
 # rascunho por-release (use com gh release create --notes-file)
 docs/_release-notes.md
