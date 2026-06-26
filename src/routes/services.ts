@@ -107,6 +107,20 @@ export default async function serviceRoutes(app: FastifyInstance) {
     return { removed: key };
   });
 
+  // Atualiza o valor de uma variável existente sem apagar e recriar.
+  app.patch('/:id/env/:key', async (req, reply) => {
+    const { id, key } = req.params as { id: string; key: string };
+    const body = z.object({ value: z.string(), isSecret: z.boolean().optional() }).parse(req.body);
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const ev = s.envVars.find((e) => e.key === decodeURIComponent(key));
+    if (!ev) return reply.code(404).send({ error: 'variável não encontrada' });
+    const isSecret = body.isSecret ?? ev.isSecret;
+    const stored = isSecret ? encrypt(body.value) : body.value;
+    await prisma.envVar.update({ where: { id: ev.id }, data: { value: stored, isSecret } });
+    return { ok: true, key };
+  });
+
   // Revela o valor real de uma variável secreta (decifrado). Só o dono do serviço.
   app.get('/:id/env/:key/reveal', async (req, reply) => {
     const { id, key } = req.params as { id: string; key: string };
