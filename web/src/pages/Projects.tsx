@@ -26,6 +26,7 @@ export function Projects() {
   const [name, setName] = useState('');
   const [sort, setSort] = useState<Sort>('name');
   const [view, setView] = useState<View>('expanded');
+  const [search, setSearch] = useState('');
 
   const create = useMutation({
     mutationFn: () => api.post<Project>('/projects', { name }),
@@ -39,8 +40,13 @@ export function Projects() {
         ? a.name.localeCompare(b.name)
         : new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
     );
-    return list;
-  }, [data, sort]);
+    if (!search.trim()) return list;
+    const q = search.trim().toLowerCase();
+    return list.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.services ?? []).some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [data, sort, search]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -49,6 +55,15 @@ export function Projects() {
       {/* cabeçalho + toolbar (estilo EasyPanel) */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <h2 className="text-xl font-semibold text-ink">Projetos</h2>
+        <div className="relative flex-1 sm:max-w-xs">
+          <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+          <input
+            className="field pl-8 text-sm"
+            placeholder="Buscar projeto ou serviço…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button className="btn-brand text-sm" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Novo</button>
           <Segmented
@@ -69,11 +84,15 @@ export function Projects() {
       ) : error ? (
         <Empty title="Não consegui carregar" hint={(error as Error).message} />
       ) : projects.length === 0 ? (
-        <Empty
-          title="Nenhum projeto ainda"
-          hint="Crie seu primeiro projeto para começar a subir apps e bancos."
-          action={<button className="btn-brand" onClick={() => setOpen(true)}>Criar projeto</button>}
-        />
+        search ? (
+          <Empty title={`Sem resultados para "${search}"`} hint="Tente outro termo ou limpe a busca." />
+        ) : (
+          <Empty
+            title="Nenhum projeto ainda"
+            hint="Crie seu primeiro projeto para começar a subir apps e bancos."
+            action={<button className="btn-brand" onClick={() => setOpen(true)}>Criar projeto</button>}
+          />
+        )
       ) : (
         <div className="space-y-7">
           {projects.map((p) => (
