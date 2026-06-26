@@ -332,7 +332,7 @@ function projectView(p: DemoProject): Project {
   return { id: p.id, name: p.name, slug: p.slug, createdAt: p.createdAt, services };
 }
 function serviceLite(s: DemoService): Service {
-  return { id: s.id, name: s.name, type: s.type, status: s.status, containerId: s.containerId, spec: s.spec, projectId: s.projectId, createdAt: s.createdAt };
+  return { id: s.id, name: s.name, type: s.type, status: s.status, containerId: s.containerId, spec: s.spec, projectId: s.projectId, createdAt: s.createdAt, domains: s.domains };
 }
 function serviceFull(s: DemoService): ServiceFull {
   const proj = store.projects.find((p) => p.id === s.projectId);
