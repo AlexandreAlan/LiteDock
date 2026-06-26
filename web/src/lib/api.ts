@@ -150,6 +150,7 @@ export interface ContainerStat {
   name: string;
   project: string | null;
   managed: boolean;
+  serviceId?: string | null;
   state: string;
   running: boolean;
   cpuPct: number;
