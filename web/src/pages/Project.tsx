@@ -130,7 +130,7 @@ export function Project() {
           </button>
         </div>
       </div>
-      {rename.error && <div className="mt-1"><ErrorNote message={(rename.error as Error).message} /></div>}
+      {rename.error instanceof Error && <div className="mt-1"><ErrorNote message={rename.error.message} /></div>}
 
       {services.length === 0 ? (
         <Empty
@@ -291,7 +291,7 @@ function BridgesModal({ projectId, projectName, open, onClose }: { projectId: st
                   {connect.isPending ? '...' : 'Conectar'}
                 </button>
               </div>
-              {connect.error && <div className="mt-2"><ErrorNote message={(connect.error as Error).message} /></div>}
+              {connect.error instanceof Error && <div className="mt-2"><ErrorNote message={connect.error.message} /></div>}
               <p className="mt-1.5 text-xs text-muted">Os serviços de ambos passam a se enxergar pelo nome do container. Vale pros que já estão no ar e pros próximos deploys.</p>
             </div>
           </>
