@@ -467,3 +467,28 @@ export async function reconcileInterruptedDeploys(reason: string): Promise<{ dep
   }
   return { deployments, containers };
 }
+
+// Sincroniza status de todos os serviços com o estado real do Docker.
+// Chamado periodicamente pelo servidor para manter a lista de projetos precisa,
+// mesmo quando containers caem sem passar pelas rotas de lifecycle do LiteDock.
+export async function syncContainerStatuses(): Promise<void> {
+  const services = await prisma.service.findMany({
+    where: { containerId: { not: null }, status: { notIn: ['stopped', 'created'] } },
+    select: { id: true, containerId: true, status: true },
+  });
+  for (const s of services) {
+    try {
+      const info = await docker.getContainer(s.containerId!).inspect();
+      const st = info.State as { Running: boolean };
+      const target = st.Running ? 'running' : 'stopped';
+      if (target !== s.status) {
+        await prisma.service.update({ where: { id: s.id }, data: { status: target } }).catch(() => {});
+      }
+    } catch {
+      // Container não existe mais — marca como stopped.
+      if (s.status !== 'stopped') {
+        await prisma.service.update({ where: { id: s.id }, data: { status: 'stopped' } }).catch(() => {});
+      }
+    }
+  }
+}
