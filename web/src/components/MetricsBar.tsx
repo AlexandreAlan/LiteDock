@@ -43,14 +43,20 @@ function Spark({ data, color, max }: { data: number[]; color: string; max?: numb
   );
 }
 
-function MetricCard({ label, value, sub, data, color, max }: {
-  label: string; value: string; sub: string; data: number[]; color: string; max?: number;
+function MetricCard({ label, value, sub, data, color, max, pct }: {
+  label: string; value: string; sub: string; data: number[]; color: string; max?: number; pct?: number;
 }) {
+  const alertClass = pct !== undefined
+    ? pct >= 90 ? 'ring-1 ring-bad/40 bg-bad/5' : pct >= 75 ? 'ring-1 ring-warn/30 bg-warn/5' : ''
+    : '';
+  const valueClass = pct !== undefined
+    ? pct >= 90 ? 'text-bad' : pct >= 75 ? 'text-warn' : 'text-ink'
+    : 'text-ink';
   return (
-    <div className="card relative overflow-hidden p-4 pb-14">
+    <div className={`card relative overflow-hidden p-4 pb-14 transition-colors ${alertClass}`}>
       <div className="relative z-10">
         <div className="text-xs font-medium text-muted">{label}</div>
-        <div className="mt-0.5 text-[26px] font-bold leading-tight tabular-nums text-ink">{value}</div>
+        <div className={`mt-0.5 text-[26px] font-bold leading-tight tabular-nums ${valueClass}`}>{value}</div>
         <div className="truncate text-[11px] text-muted">{sub}</div>
       </div>
       <Spark data={data} color={color} max={max} />
@@ -95,9 +101,9 @@ export function MetricsBar() {
   const netMax = Math.max(1, ...HIST.in, ...HIST.out);
   return (
     <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      <MetricCard label="CPU" value={`${m.cpu.pct.toFixed(1)}%`} sub={`${m.cpu.cores} cores · load ${m.cpu.load.map((l) => l.toFixed(2)).join(', ')}`} data={HIST.cpu} color="#F97316" max={100} />
-      <MetricCard label="Memória" value={`${m.memory.pct.toFixed(1)}%`} sub={`${gb(m.memory.usedBytes)} / ${gb(m.memory.totalBytes)}`} data={HIST.mem} color="#3B82F6" max={100} />
-      <MetricCard label="Disco" value={`${m.disk.pct.toFixed(1)}%`} sub={`${gb(m.disk.usedBytes)} / ${gb(m.disk.totalBytes)}`} data={HIST.disk} color="#10B981" max={100} />
+      <MetricCard label="CPU" value={`${m.cpu.pct.toFixed(1)}%`} sub={`${m.cpu.cores} cores · load ${m.cpu.load.map((l) => l.toFixed(2)).join(', ')}`} data={HIST.cpu} color="#F97316" max={100} pct={m.cpu.pct} />
+      <MetricCard label="Memória" value={`${m.memory.pct.toFixed(1)}%`} sub={`${gb(m.memory.usedBytes)} / ${gb(m.memory.totalBytes)}`} data={HIST.mem} color="#3B82F6" max={100} pct={m.memory.pct} />
+      <MetricCard label="Disco" value={`${m.disk.pct.toFixed(1)}%`} sub={`${gb(m.disk.usedBytes)} / ${gb(m.disk.totalBytes)}`} data={HIST.disk} color="#10B981" max={100} pct={m.disk.pct} />
       <MetricCard label="Entrada de rede" value={bps(m.network.inBps)} sub="tráfego de entrada" data={HIST.in} color="#0EA5E9" max={netMax} />
       <MetricCard label="Saída de rede" value={bps(m.network.outBps)} sub="tráfego de saída" data={HIST.out} color="#A855F7" max={netMax} />
     </div>
