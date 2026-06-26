@@ -1,0 +1,12 @@
+node_modules/
+web/node_modules/
+web/dist/
+dist/
+.env
+.env.*
+*.bak-*
+*.log
+.git/
+.github/
+docs/
+deploy-worker/
