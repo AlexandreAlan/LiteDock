@@ -528,6 +528,9 @@ function DeploysTab({ s, live, onRedeploy, deploying }: { s: ServiceFull; live?:
                   </span>
                   <span className="flex items-center gap-3 text-xs text-muted">
                     <span>{new Date(d.startedAt).toLocaleString('pt-BR')}</span>
+                    {d.finishedAt && (
+                      <span>{Math.round((new Date(d.finishedAt).getTime() - new Date(d.startedAt).getTime()) / 1000)}s</span>
+                    )}
                     <span className={`rounded bg-panel2 px-2 py-0.5 ${statusColor(d.status)}`}>{d.status}</span>
                     <Icon name="chevronDown" className={`h-3.5 w-3.5 transition-transform ${expandedDep === d.id ? 'rotate-180' : ''}`} />
                   </span>
