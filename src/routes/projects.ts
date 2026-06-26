@@ -14,7 +14,7 @@ export default async function projectRoutes(app: FastifyInstance) {
   app.get('/', async (req) => {
     return prisma.project.findMany({
       where: { ownerId: req.user.sub },
-      include: { services: true },
+      include: { services: { include: { domains: true } } },
       orderBy: { createdAt: 'desc' },
     });
   });
