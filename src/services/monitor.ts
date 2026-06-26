@@ -25,6 +25,7 @@ function sumNet(s: any): { rx: number; tx: number } {
 export interface ScheduleInfo { startTime: string | null; stopTime: string | null; enabled: boolean }
 export interface ContainerStat {
   id: string; name: string; project: string | null; managed: boolean;
+  serviceId: string | null;
   state: string; running: boolean;
   cpuPct: number; memBytes: number; netInBps: number; netOutBps: number;
   schedule: ScheduleInfo | null;
@@ -47,6 +48,7 @@ export async function containerStats(): Promise<ContainerStat[]> {
         name,
         project: (c.Labels?.['litedock.project'] as string) || null,
         managed: c.Labels?.['litedock.managed'] === 'true',
+        serviceId: (c.Labels?.['litedock.service'] as string) || null,
         state: c.State,
         running,
         schedule: s0 ? { startTime: s0.startTime, stopTime: s0.stopTime, enabled: s0.enabled } : null,
@@ -178,11 +180,13 @@ export interface DockerEvent { type: string; action: string; time: number; name?
 const events: DockerEvent[] = [];
 let started = false;
 
-export function startDockerEvents() {
-  if (started) return;
-  started = true;
+function connectDockerEvents() {
   docker.getEvents((err: unknown, stream: NodeJS.ReadableStream | undefined) => {
-    if (err || !stream) { started = false; return; }
+    if (err || !stream) {
+      started = false;
+      setTimeout(connectDockerEvents, 10_000); // reconecta em 10s após falha
+      return;
+    }
     stream.on('data', (buf: Buffer) => {
       for (const line of buf.toString('utf8').split('\n')) {
         if (!line.trim()) continue;
@@ -198,8 +202,15 @@ export function startDockerEvents() {
         } catch { /* linha parcial */ }
       }
     });
-    stream.on('error', () => { started = false; });
+    stream.on('end', () => { started = false; setTimeout(connectDockerEvents, 5_000); });
+    stream.on('error', () => { started = false; setTimeout(connectDockerEvents, 10_000); });
   });
+}
+
+export function startDockerEvents() {
+  if (started) return;
+  started = true;
+  connectDockerEvents();
 }
 
 export function dockerEvents(limit = 60): DockerEvent[] {
