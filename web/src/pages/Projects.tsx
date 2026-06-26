@@ -144,19 +144,26 @@ export function Projects() {
                   </Link>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {p.services!.map((s) => (
-                      <Link
-                        key={s.id}
-                        to={`/service/${s.id}`}
-                        className="card flex items-center justify-between gap-2 p-3.5 transition-shadow hover:shadow-pop"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-ink">{s.name}</div>
-                          <div className="mt-0.5 text-xs text-muted">{typeLabel(s)}</div>
-                        </div>
-                        <StatusDot state={s.status} />
-                      </Link>
-                    ))}
+                    {p.services!.map((s) => {
+                      const primaryDomain = s.domains?.[0];
+                      return (
+                        <Link
+                          key={s.id}
+                          to={`/service/${s.id}`}
+                          className="card flex items-center justify-between gap-2 p-3.5 transition-shadow hover:shadow-pop"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium text-ink">{s.name}</div>
+                            {primaryDomain ? (
+                              <div className="mt-0.5 truncate text-xs text-brand/70">{primaryDomain.host}</div>
+                            ) : (
+                              <div className="mt-0.5 text-xs text-muted">{typeLabel(s)}</div>
+                            )}
+                          </div>
+                          <StatusDot state={s.status} />
+                        </Link>
+                      );
+                    })}
                   </div>
                 ))}
             </section>
