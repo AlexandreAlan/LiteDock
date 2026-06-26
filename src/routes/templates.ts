@@ -108,6 +108,15 @@ export default async function templateRoutes(app: FastifyInstance) {
     }
 
     reply.code(201);
-    return { installed: tpl.slug, base, services: created };
+    // Retorna as senhas geradas para que o frontend possa exibi-las uma única vez.
+    // Inclui também as credenciais padrão fixas do app, se houver.
+    const credentialsPayload: {
+      generated?: Record<string, string>;
+      defaults?: { user: string; password: string; note?: string };
+    } = {};
+    if (Object.keys(vars).length) credentialsPayload.generated = vars;
+    if (tpl.defaultCredentials) credentialsPayload.defaults = tpl.defaultCredentials;
+
+    return { installed: tpl.slug, base, services: created, credentials: credentialsPayload };
   });
 }
