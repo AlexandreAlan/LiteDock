@@ -15,6 +15,9 @@ const NAV = [
   { to: '/domains', label: 'Domínios', icon: 'globe' as const },
   { to: '/settings', label: 'Ajustes', icon: 'settings' as const },
 ];
+const NAV_ADMIN = [
+  { to: '/users', label: 'Usuários', icon: 'users' as const },
+];
 
 const LINKS = [
   { label: 'Documentação', href: 'https://github.com/AlexandreAlan/LiteDock', ext: true, icon: 'book' as const },
@@ -136,6 +139,31 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {(user?.role === 'owner' || user?.role === 'admin') && (
+          <>
+            <div className="my-3 border-t border-line" />
+            <nav className="flex flex-col gap-0.5 px-3">
+              {NAV_ADMIN.map((n) => (
+                <NavLink
+                  key={n.to}
+                  to={n.to}
+                  className={({ isActive }) =>
+                    [
+                      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-brand/10 text-ink ring-1 ring-inset ring-brand/25'
+                        : 'text-ink/70 hover:bg-panel2 hover:text-ink',
+                    ].join(' ')
+                  }
+                >
+                  <Icon name={n.icon} className="h-[18px] w-[18px]" />
+                  {n.label}
+                </NavLink>
+              ))}
+            </nav>
+          </>
+        )}
 
         <div className="my-3 border-t border-line" />
 
