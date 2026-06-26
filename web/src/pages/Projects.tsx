@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project, type Service } from '../lib/api';
+import { toast } from '../lib/toast';
 import { Modal } from '../components/Modal';
 import { MetricsBar } from '../components/MetricsBar';
 import { StatusDot } from '../components/StatusDot';
@@ -30,7 +31,8 @@ export function Projects() {
 
   const create = useMutation({
     mutationFn: () => api.post<Project>('/projects', { name }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); setOpen(false); setName(''); },
+    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['projects'] }); setOpen(false); setName(''); toast.success(`Projeto "${p.name}" criado.`); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   const projects = useMemo(() => {
