@@ -569,6 +569,76 @@ function LogsTab({ id }: { id: string }) {
   );
 }
 
+// ── Agendamento de liga/desliga ──────────────────────────────────────────
+interface ScheduleInfo { startTime: string | null; stopTime: string | null; enabled: boolean }
+function ScheduleCard({ containerName }: { containerName: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ['schedule', containerName],
+    queryFn: () => api.get<ScheduleInfo>(`/servers/local/containers/${encodeURIComponent(containerName)}/schedule`),
+  });
+  const sched = q.data;
+  const [start, setStart] = useState('');
+  const [stop, setStop] = useState('');
+  useEffect(() => { if (sched) { setStart(sched.startTime ?? ''); setStop(sched.stopTime ?? ''); } }, [sched]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.put(`/servers/local/containers/${encodeURIComponent(containerName)}/schedule`, {
+        startTime: start || null,
+        stopTime: stop || null,
+        enabled: true,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['schedule', containerName] }),
+  });
+  const clear = useMutation({
+    mutationFn: () => api.del(`/servers/local/containers/${encodeURIComponent(containerName)}/schedule`),
+    onSuccess: () => { setStart(''); setStop(''); qc.invalidateQueries({ queryKey: ['schedule', containerName] }); },
+  });
+
+  return (
+    <Card
+      title="Agendamento"
+      subtitle="Liga e desliga o container automaticamente por horário diário (HH:MM, horário do servidor)."
+    >
+      {q.isLoading ? <Spinner /> : (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label mb-1 block">Ligar às</label>
+              <input className="field" type="time" value={start} onChange={(e) => setStart(e.target.value)} placeholder="08:00" />
+              <p className="mt-1 text-xs text-muted">Vazio = não liga automaticamente</p>
+            </div>
+            <div>
+              <label className="label mb-1 block">Desligar às</label>
+              <input className="field" type="time" value={stop} onChange={(e) => setStop(e.target.value)} placeholder="22:00" />
+              <p className="mt-1 text-xs text-muted">Vazio = não desliga automaticamente</p>
+            </div>
+          </div>
+          {sched?.enabled && (sched.startTime || sched.stopTime) && (
+            <div className="flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted">
+              <Icon name="history" className="h-3.5 w-3.5 text-brand" />
+              Agendamento ativo: {sched.startTime ? `liga às ${sched.startTime}` : ''}{sched.startTime && sched.stopTime ? ' · ' : ''}{sched.stopTime ? `desliga às ${sched.stopTime}` : ''}
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <button className="btn-brand text-sm" disabled={save.isPending} onClick={() => save.mutate()}>
+              {save.isPending ? 'Salvando…' : 'Salvar agendamento'}
+            </button>
+            {(sched?.startTime || sched?.stopTime) && (
+              <button className="btn-ghost text-sm text-bad" disabled={clear.isPending} onClick={() => clear.mutate()}>
+                {clear.isPending ? '…' : 'Remover agendamento'}
+              </button>
+            )}
+            {save.isSuccess && <span className="text-xs text-ok">Salvo ✓</span>}
+            {(save.error || clear.error) && <ErrorNote message={((save.error || clear.error) as Error).message} />}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ── Advanced (webhook + danger zone) ────────────────────────────────────
 function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: () => void; destroying: boolean }) {
   const [webhook, setWebhook] = useState<string | null>(null);
@@ -591,6 +661,8 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
           </div>
         )}
       </Card>
+
+      {s.containerId && <ScheduleCard containerName={s.containerId} />}
 
       <LimitsCard s={s} />
 
