@@ -188,7 +188,7 @@ export function Projects() {
           <label className="label mb-1 block">Nome do projeto</label>
           <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="meu-projeto" autoFocus />
         </div>
-        {create.error && <p className="mt-2 text-sm text-bad">{(create.error as Error).message}</p>}
+        {create.error instanceof Error && <p className="mt-2 text-sm text-bad">{create.error.message}</p>}
       </Modal>
     </div>
   );
