@@ -4,6 +4,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type TemplateCatalog as TCatalog, type TemplateCard } from '../lib/api';
 import { toast } from '../lib/toast';
 import { Spinner, ErrorNote } from './ui';
+import { Icon } from './icons';
+
+interface InstallResult {
+  installed: string;
+  services: { id: string; name: string; type: string }[];
+  credentials?: {
+    generated?: Record<string, string>;
+    defaults?: { user: string; password: string; note?: string };
+  };
+}
 
 // Loja de templates estilo EasyPanel: busca + categorias + cards com 1-clique.
 export function TemplateCatalog({
@@ -21,6 +31,7 @@ export function TemplateCatalog({
   const [cat, setCat] = useState<string>('Todos');
   const [installing, setInstalling] = useState<string | null>(null);
   const [err, setErr] = useState('');
+  const [credResult, setCredResult] = useState<{ name: string; creds: InstallResult['credentials']; serviceId: string } | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['templates'],
@@ -30,15 +41,20 @@ export function TemplateCatalog({
 
   const install = useMutation({
     mutationFn: (slug: string) =>
-      api.post<{ installed: string; services: { id: string; name: string; type: string }[] }>(`/templates/${slug}/install`, { projectId }),
+      api.post<InstallResult>(`/templates/${slug}/install`, { projectId }),
     onMutate: (slug: string) => { setInstalling(slug); setErr(''); },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['project', projectId] });
       qc.invalidateQueries({ queryKey: ['projects'] });
-      toast.success(`Template "${r.installed}" instalado — deploy iniciado automaticamente.`);
-      onClose();
-      const app = r.services.find((s) => s.type === 'app') ?? r.services[0];
-      if (app) navigate(`/service/${app.id}`);
+      const appService = r.services.find((s) => s.type === 'app') ?? r.services[0];
+      // Se há credenciais geradas ou padrão, mostra o modal antes de navegar
+      if (r.credentials && (r.credentials.generated || r.credentials.defaults)) {
+        setCredResult({ name: r.installed, creds: r.credentials, serviceId: appService?.id ?? '' });
+      } else {
+        toast.success(`Template "${r.installed}" instalado — deploy iniciado.`);
+        onClose();
+        if (appService) navigate(`/service/${appService.id}`);
+      }
     },
     onError: (e: unknown) => setErr(e instanceof Error ? e.message : 'Falhou ao instalar'),
     onSettled: () => setInstalling(null),
@@ -55,6 +71,22 @@ export function TemplateCatalog({
   }, [data, q, cat]);
 
   if (!open) return null;
+
+  // Modal de credenciais pós-instalação
+  if (credResult) {
+    return (
+      <CredentialsModal
+        name={credResult.name}
+        creds={credResult.creds}
+        onClose={() => {
+          const id = credResult.serviceId;
+          setCredResult(null);
+          onClose();
+          if (id) navigate(`/service/${id}`);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[6vh] backdrop-blur-sm" onClick={onClose}>
@@ -123,6 +155,11 @@ function Card({ tpl, busy, onInstall }: { tpl: TemplateCard; busy: boolean; onIn
           {tpl.serviceCount > 1 && (
             <span className="rounded-full bg-panel2 px-1.5 text-[10px] text-muted">{tpl.serviceCount} serviços</span>
           )}
+          {(tpl as TemplateCard & { hasCredentials?: boolean }).hasCredentials && (
+            <span className="flex items-center gap-0.5 rounded-full border border-brand/20 bg-brand/5 px-1.5 text-[10px] text-brand">
+              <Icon name="shield" className="h-2.5 w-2.5" /> creds
+            </span>
+          )}
         </div>
         <p className="mt-0.5 line-clamp-2 text-xs text-muted">{tpl.description}</p>
         <button
@@ -131,6 +168,91 @@ function Card({ tpl, busy, onInstall }: { tpl: TemplateCard; busy: boolean; onIn
           className="btn-brand mt-2 px-3 py-1 text-xs disabled:opacity-60"
         >
           {busy ? 'Instalando…' : 'Instalar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal exibido uma única vez após instalação — mostra as credenciais geradas.
+function CredentialsModal({
+  name,
+  creds,
+  onClose,
+}: {
+  name: string;
+  creds: InstallResult['credentials'];
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function copy(val: string, key: string) {
+    navigator.clipboard?.writeText(val);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-xl border border-brand/30 bg-panel shadow-pop">
+        <div className="border-b border-line p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ok/10 text-ok">
+              <Icon name="shield" className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-ink">Credenciais de acesso</h2>
+              <p className="text-xs text-muted">{name} — salve antes de fechar</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn">
+            Estas credenciais são exibidas <span className="font-semibold">uma única vez</span>. Salve-as agora.
+          </div>
+
+          {/* Credenciais geradas (senhas aleatórias fortes) */}
+          {creds?.generated && Object.entries(creds.generated).map(([key, val]) => (
+            <CredRow key={key} label={key} value={val} copied={copied === key} onCopy={() => copy(val, key)} />
+          ))}
+
+          {/* Credenciais padrão do app */}
+          {creds?.defaults && (
+            <>
+              <CredRow label="Usuário" value={creds.defaults.user} copied={copied === 'user'} onCopy={() => copy(creds.defaults!.user, 'user')} />
+              <CredRow label="Senha" value={creds.defaults.password} copied={copied === 'password'} onCopy={() => copy(creds.defaults!.password, 'password')} />
+              {creds.defaults.note && (
+                <p className="text-xs text-muted">{creds.defaults.note}</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="border-t border-line px-5 py-4">
+          <button onClick={onClose} className="btn-brand w-full">
+            Entendido — ir para o serviço
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CredRow({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <div>
+      <div className="label mb-1">{label}</div>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 truncate rounded-lg border border-line bg-panel2 px-3 py-2 font-mono text-sm text-ink">
+          {value}
+        </code>
+        <button
+          onClick={onCopy}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:bg-panel2 hover:text-ink"
+          title="Copiar"
+        >
+          <Icon name={copied ? 'check' : 'copy'} className="h-4 w-4" />
         </button>
       </div>
     </div>
