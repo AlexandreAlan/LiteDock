@@ -22,7 +22,7 @@ type View = 'expanded' | 'collapsed';
 
 export function Projects() {
   const qc = useQueryClient();
-  const { data, isLoading, error } = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/projects') });
+  const { data, isLoading, error } = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/projects'), refetchInterval: 30000 });
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [sort, setSort] = useState<Sort>('name');
