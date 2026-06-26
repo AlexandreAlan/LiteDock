@@ -107,6 +107,16 @@ export default async function serviceRoutes(app: FastifyInstance) {
     return { removed: key };
   });
 
+  // Revela o valor real de uma variável secreta (decifrado). Só o dono do serviço.
+  app.get('/:id/env/:key/reveal', async (req, reply) => {
+    const { id, key } = req.params as { id: string; key: string };
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    const ev = s.envVars.find((e) => e.key === decodeURIComponent(key));
+    if (!ev) return reply.code(404).send({ error: 'variável não encontrada' });
+    return { key: ev.key, value: ev.isSecret ? decrypt(ev.value) : ev.value };
+  });
+
   // ---- domínios ----
   app.post('/:id/domains', async (req, reply) => {
     const { id } = req.params as { id: string };
