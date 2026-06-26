@@ -102,12 +102,7 @@ export function Settings() {
               desc="Exponha o painel e os serviços sem abrir portas, via cloudflared. Requer um token de túnel da Cloudflare."
             />
           )}
-          {tab === 'storage' && (
-            <RoadmapSection
-              title="Provedores de armazenamento"
-              desc="Configure destinos de backup (S3, Backblaze B2, etc.) para guardar snapshots dos serviços fora da VPS."
-            />
-          )}
+          {tab === 'storage' && <StorageSection />}
           {tab === 'builders' && (
             <RoadmapSection
               title="Construtores Docker"
@@ -795,13 +790,123 @@ function SnapshotsSection() {
   );
 }
 
+// ── Armazenamento ──────────────────────────────────────────────────────────
+function StorageSection() {
+  const { data: items, isLoading } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => api.get<{ name: string; kind: string; sizeBytes: number; path: string }[]>('/servers/local/storage'),
+  });
+  const { data: df } = useQuery({
+    queryKey: ['df'],
+    queryFn: () => api.get<{ images: { count: number; sizeHuman: string; reclaimableHuman: string }; volumes: { count: number; sizeHuman: string } }>('/servers/local/system/df'),
+  });
+
+  function fmtBytes(b: number) {
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 ** 2) return `${(b / 1024).toFixed(1)} KB`;
+    if (b < 1024 ** 3) return `${(b / 1024 ** 2).toFixed(1)} MB`;
+    return `${(b / 1024 ** 3).toFixed(2)} GB`;
+  }
+
+  const volumes = (items ?? []).filter((i) => i.kind === 'volume');
+  const containers = (items ?? []).filter((i) => i.kind === 'container');
+
+  return (
+    <div className="space-y-6">
+      {df && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="plate-2 p-4">
+            <div className="stamp mb-1">Volumes Docker</div>
+            <div className="text-xl font-bold text-ink">{df.volumes.sizeHuman}</div>
+            <div className="mt-0.5 text-xs text-muted">{df.volumes.count} volume{df.volumes.count !== 1 ? 's' : ''}</div>
+          </div>
+          <div className="plate-2 p-4">
+            <div className="stamp mb-1">Imagens Docker</div>
+            <div className="text-xl font-bold text-ink">{df.images.sizeHuman}</div>
+            <div className="mt-0.5 text-xs text-muted">{df.images.reclaimableHuman} recuperáveis</div>
+          </div>
+        </div>
+      )}
+
+      {volumes.length > 0 && (
+        <Card title="Volumes dos serviços">
+          {isLoading ? <Spinner /> : (
+            <div className="divide-y divide-line">
+              {volumes.map((v) => (
+                <div key={v.name} className="flex items-center justify-between py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-ink">{v.name}</div>
+                    <div className="text-xs text-muted font-mono">{v.path}</div>
+                  </div>
+                  <span className="shrink-0 text-sm tabular-nums text-muted">{fmtBytes(v.sizeBytes)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {containers.length > 0 && (
+        <Card title="Dados dos containers">
+          {isLoading ? <Spinner /> : (
+            <div className="divide-y divide-line">
+              {containers.map((c) => (
+                <div key={c.name} className="flex items-center justify-between py-2.5">
+                  <div className="truncate text-sm font-medium text-ink">{c.name}</div>
+                  <span className="text-sm tabular-nums text-muted">{fmtBytes(c.sizeBytes)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <Card title="Provedores de backup externo">
+        <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
+          <Icon name="info" className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+          <div>
+            <p className="text-sm text-ink">Integração com S3 / Backblaze B2 em desenvolvimento.</p>
+            <p className="mt-1 text-xs text-muted">Por enquanto, os volumes acima ficam na VPS local. Faça backups manuais via SSH ou snapshots do provedor de VPS.</p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ── Marca / Notificações / Licença ──────────────────────────────────────────
 function MarcaSection() {
   const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Record<string, string>>('/settings') });
   const [brandName, setBrandName] = useState('');
   const [brandLogoUrl, setBrandLogoUrl] = useState('');
-  useEffect(() => { if (settings) { setBrandName(settings.brandName ?? ''); setBrandLogoUrl(settings.brandLogoUrl ?? ''); } }, [settings]);
+  const [previewUrl, setPreviewUrl] = useState('');
+  useEffect(() => {
+    if (settings) {
+      setBrandName(settings.brandName ?? '');
+      setBrandLogoUrl(settings.brandLogoUrl ?? '');
+      setPreviewUrl(settings.brandLogoUrl ?? '');
+    }
+  }, [settings]);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) { toast.error('Logo muito grande (máx 512 KB).'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setBrandLogoUrl(dataUrl);
+      setPreviewUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearLogo() {
+    setBrandLogoUrl('');
+    setPreviewUrl('');
+  }
+
   return (
     <Card title="Marca">
       <div className="max-w-md">
@@ -811,9 +916,42 @@ function MarcaSection() {
             <input className="field" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="LiteDock" />
           </div>
           <div>
-            <label className="label mb-1 block">URL do logo</label>
-            <input className="field" value={brandLogoUrl} onChange={(e) => setBrandLogoUrl(e.target.value)} placeholder="https://…/logo.png" />
-            <p className="mt-1 text-xs text-muted">Personalize o nome e o logo exibidos no painel.</p>
+            <label className="label mb-1 block">Logo</label>
+            <div className="flex items-center gap-4">
+              {previewUrl ? (
+                <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-line bg-panel2">
+                  <img src={previewUrl} alt="logo" className="h-full w-full object-contain p-1" />
+                  <button
+                    type="button"
+                    onClick={clearLogo}
+                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-bad text-[10px] text-white shadow"
+                    title="Remover logo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border-2 border-dashed border-line bg-panel2 text-muted">
+                  <Icon name="cube" className="h-6 w-6 opacity-40" />
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <label className="btn-ghost cursor-pointer text-sm">
+                  <Icon name="folder" className="h-4 w-4" />
+                  Enviar arquivo (PNG/SVG)
+                  <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
+                </label>
+                <div>
+                  <input
+                    className="field text-xs"
+                    value={brandLogoUrl.startsWith('data:') ? '' : brandLogoUrl}
+                    onChange={(e) => { setBrandLogoUrl(e.target.value); setPreviewUrl(e.target.value); }}
+                    placeholder="ou cole a URL do logo…"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted">Recomendado: PNG ou SVG quadrado, até 512 KB. Aparece na sidebar.</p>
           </div>
         </SaveBlock>
       </div>
