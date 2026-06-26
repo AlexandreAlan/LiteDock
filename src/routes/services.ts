@@ -5,6 +5,7 @@ import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { encrypt, decrypt } from '../lib/crypto.js';
 import * as deploy from '../services/deploy.js';
+import { docker } from '../services/docker.js';
 import { enqueue } from '../lib/queue.js';
 import { workerDeploy, workerHealth, type WorkerSpec } from '../services/worker.js';
 import { getMetricsHistory } from '../services/monitor.js';
@@ -32,13 +33,34 @@ export default async function serviceRoutes(app: FastifyInstance) {
     return { samples: getMetricsHistory(name) };
   });
 
-  // Detalhe (segredos mascarados).
+  // Detalhe (segredos mascarados). Status sincronizado com Docker quando há containerId.
   app.get('/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const s = await loadOwned(req, id);
     if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+
+    let liveStatus = s.status;
+    if (s.containerId) {
+      try {
+        const info = await docker.getContainer(s.containerId).inspect();
+        const st = info.State as { Running: boolean; Health?: { Status: string } };
+        if (st.Running) {
+          const health = st.Health?.Status;
+          liveStatus = (health === 'unhealthy' || health === 'starting') ? 'restarting' : 'running';
+        } else {
+          liveStatus = 'stopped';
+        }
+        if (liveStatus !== s.status) {
+          prisma.service.update({ where: { id }, data: { status: liveStatus } }).catch(() => {});
+        }
+      } catch {
+        liveStatus = 'stopped';
+      }
+    }
+
     return {
       ...s,
+      status: liveStatus,
       envVars: s.envVars.map((e) => ({ key: e.key, value: e.isSecret ? '••••••' : e.value, isSecret: e.isSecret })),
     };
   });
