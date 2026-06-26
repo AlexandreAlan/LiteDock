@@ -360,6 +360,49 @@ function parseEnvText(text: string): { key: string; value: string }[] {
     .filter(({ key }) => /^[A-Z_][A-Z0-9_]*$/i.test(key));
 }
 
+function EnvRow({ svcId, envKey, masked, isSecret, onRemoved }: { svcId: string; envKey: string; masked: string; isSecret: boolean; onRemoved: () => void }) {
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const shown = revealed ?? masked;
+
+  async function reveal() {
+    if (revealed) { setRevealed(null); return; }
+    setLoading(true);
+    try {
+      const r = await api.get<{ value: string }>(`/services/${svcId}/env/${encodeURIComponent(envKey)}/reveal`);
+      setRevealed(r.value);
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copy() {
+    const val = revealed ?? (isSecret ? (await api.get<{ value: string }>(`/services/${svcId}/env/${encodeURIComponent(envKey)}/reveal`)).value : masked);
+    navigator.clipboard?.writeText(val);
+    toast.success('Valor copiado.');
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 py-2 text-sm">
+      <span className="font-mono font-medium text-ink shrink-0">{envKey}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-mono text-xs text-muted max-w-[16rem]">{shown}</span>
+        {isSecret && (
+          <button onClick={reveal} disabled={loading} title={revealed ? 'Ocultar' : 'Revelar'} className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink disabled:opacity-40">
+            <Icon name={revealed ? 'eyeOff' : 'eye'} className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <button onClick={copy} title="Copiar valor" className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink">
+          <Icon name="copy" className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={onRemoved} className="text-xs text-bad hover:underline">remover</button>
+      </span>
+    </li>
+  );
+}
+
 function EnvTab({ s }: { s: ServiceFull }) {
   const qc = useQueryClient();
   const [k, setK] = useState('');
@@ -431,13 +474,14 @@ function EnvTab({ s }: { s: ServiceFull }) {
       {s.envVars && s.envVars.length > 0 ? (
         <ul className="mb-4 divide-y divide-line">
           {s.envVars.map((e) => (
-            <li key={e.key} className="flex items-center justify-between gap-2 py-2 text-sm">
-              <span className="font-mono font-medium text-ink">{e.key}</span>
-              <span className="flex items-center gap-3">
-                <span className="font-mono text-muted">{e.value}</span>
-                <button onClick={() => del.mutate(e.key)} className="text-bad hover:underline">remover</button>
-              </span>
-            </li>
+            <EnvRow
+              key={e.key}
+              svcId={s.id}
+              envKey={e.key}
+              masked={e.value}
+              isSecret={e.isSecret}
+              onRemoved={() => del.mutate(e.key)}
+            />
           ))}
         </ul>
       ) : (
@@ -590,13 +634,26 @@ function LogsTab({ id }: { id: string }) {
     }
   }, [text, auto]);
 
+  const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
+
   return (
     <Card title="Logs" subtitle="Saída do container (stdout/stderr).">
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs text-muted">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> auto-atualizar (3s)
         </label>
         <button onClick={() => logs.refetch()} className="btn-ghost text-xs">Atualizar agora</button>
+        {text && (
+          <>
+            <span className="text-xs text-muted">{lineCount} linha{lineCount !== 1 ? 's' : ''}</span>
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => { navigator.clipboard?.writeText(text); toast.success('Logs copiados.'); }}
+            >
+              Copiar tudo
+            </button>
+          </>
+        )}
       </div>
       {logs.isLoading ? <Spinner /> : logs.error ? <ErrorNote message={(logs.error as Error).message} /> : text ? (
         <pre ref={logRef} className="max-h-[28rem] overflow-auto rounded-lg bg-ink p-3 font-mono text-[11px] leading-relaxed text-panel2">{text}</pre>
