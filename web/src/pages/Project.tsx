@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from '../lib/toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project as TProject, type Service, type ServiceType } from '../lib/api';
@@ -36,12 +37,15 @@ export function Project() {
       qc.invalidateQueries({ queryKey: ['project', id] });
       qc.invalidateQueries({ queryKey: ['projects'] });
       setRenaming(false);
+      toast.success('Projeto renomeado.');
     },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   const destroy = useMutation({
     mutationFn: () => api.del(`/projects/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); navigate('/'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['projects'] }); toast.success('Projeto excluído.'); navigate('/'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   const create = useMutation({
