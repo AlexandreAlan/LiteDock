@@ -42,6 +42,15 @@ export default async function projectRoutes(app: FastifyInstance) {
     return project;
   });
 
+  // Renomeia um projeto (só o campo name; o slug não muda pois os containers o usam).
+  app.patch('/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+    const project = await prisma.project.findFirst({ where: { id, ownerId: req.user.sub } });
+    if (!project) return reply.code(404).send({ error: 'projeto nao encontrado' });
+    return prisma.project.update({ where: { id }, data: { name } });
+  });
+
   // Remove um projeto (e seus serviços, em cascata no banco).
   app.delete('/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
