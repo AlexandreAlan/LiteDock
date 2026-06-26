@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litedock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litedock
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litedock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  litedock-api:
+    image: ghcr.io/alexandrealan/litedock:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://litedock:${POSTGRES_PASSWORD}@postgres:5432/litedock
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PORT: 8088
+      TRAEFIK_NETWORK: ${TRAEFIK_NETWORK:-litedock}
+      LITEDOCK_DOCKER_PROXY: ${LITEDOCK_DOCKER_PROXY:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    volumes:
+      # Socket Docker — só necessário se não usar o Socket Proxy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  litedock-web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT_HTTP:-80}:80"
+    depends_on:
+      - litedock-api
+
+volumes:
+  postgres_data:
