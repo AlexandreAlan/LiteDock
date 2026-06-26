@@ -12,6 +12,7 @@ import { DEMO } from '../lib/demo';
 const NAV = [
   { to: '/', label: 'Projects', end: true, icon: 'grid' as const },
   { to: '/monitor', label: 'Monitor', icon: 'activity' as const },
+  { to: '/activity', label: 'Atividade', icon: 'history' as const },
   { to: '/domains', label: 'Domínios', icon: 'globe' as const },
   { to: '/settings', label: 'Ajustes', icon: 'settings' as const },
 ];
@@ -90,12 +91,13 @@ export function Layout() {
       {/* ── Sidebar ───────────────────────────────────────────────── */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-brand text-white">
-            {brandLogo ? (
-              <img src={brandLogo} alt={brandName} className="h-full w-full object-cover" />
-            ) : (
-              <Icon name="cube" className="h-[18px] w-[18px]" />
-            )}
+          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg">
+            <img
+              src={brandLogo || '/logo.svg'}
+              alt={brandName}
+              className="h-full w-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo.svg'; }}
+            />
           </span>
           <div className="leading-tight">
             <div className="text-sm font-bold text-ink">{brandName}</div>
