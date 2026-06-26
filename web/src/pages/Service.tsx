@@ -371,6 +371,7 @@ function EnvTab({ s }: { s: ServiceFull }) {
       qc.invalidateQueries({ queryKey: ['service', s.id] });
       setBulk(false);
       setBulkText('');
+      toast.success(`${pairs.length} variáveis importadas.`);
     } catch (e: unknown) {
       setBulkErr(e instanceof Error ? e.message : 'Falha ao importar');
     } finally {
@@ -672,7 +673,7 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
           <div className="mt-3">
             <div className="flex items-center gap-2">
               <input readOnly value={webhook} className="field font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
-              <button className="btn-ghost text-xs" onClick={() => navigator.clipboard?.writeText(webhook)}>Copiar</button>
+              <button className="btn-ghost text-xs" onClick={() => { navigator.clipboard?.writeText(webhook); toast.success('URL copiada.'); }}>Copiar</button>
             </div>
             <p className="mt-2 text-xs text-muted">Método <code className="text-ink">POST</code>. Gerar uma nova URL invalida a anterior.</p>
           </div>
