@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type TemplateCatalog as TCatalog, type TemplateCard } from '../lib/api';
+import { toast } from '../lib/toast';
 import { Spinner, ErrorNote } from './ui';
 
 // Loja de templates estilo EasyPanel: busca + categorias + cards com 1-clique.
@@ -14,6 +16,7 @@ export function TemplateCatalog({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string>('Todos');
   const [installing, setInstalling] = useState<string | null>(null);
@@ -27,12 +30,15 @@ export function TemplateCatalog({
 
   const install = useMutation({
     mutationFn: (slug: string) =>
-      api.post(`/templates/${slug}/install`, { projectId }),
+      api.post<{ installed: string; services: { id: string; name: string; type: string }[] }>(`/templates/${slug}/install`, { projectId }),
     onMutate: (slug: string) => { setInstalling(slug); setErr(''); },
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['project', projectId] });
       qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(`Template "${r.installed}" instalado — deploy iniciado automaticamente.`);
       onClose();
+      const app = r.services.find((s) => s.type === 'app') ?? r.services[0];
+      if (app) navigate(`/service/${app.id}`);
     },
     onError: (e: unknown) => setErr(e instanceof Error ? e.message : 'Falhou ao instalar'),
     onSettled: () => setInstalling(null),
