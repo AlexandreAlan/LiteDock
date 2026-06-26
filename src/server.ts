@@ -20,6 +20,7 @@ import webhookRoutes from './routes/webhooks.js';
 import settingsRoutes from './routes/settings.js';
 import userRoutes from './routes/users.js';
 import githubRoutes from './routes/github.js';
+import activityRoutes from './routes/activity.js';
 import { reconcileInterruptedDeploys, syncContainerStatuses } from './services/deploy.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
@@ -72,6 +73,7 @@ await app.register(templateRoutes, { prefix: '/templates' });
 await app.register(settingsRoutes, { prefix: '/settings' });
 await app.register(userRoutes, { prefix: '/users' });
 await app.register(githubRoutes, { prefix: '/github' });
+await app.register(activityRoutes, { prefix: '/activity' });
 // Webhooks de CI/CD: público (autenticado por token do serviço), sem JWT.
 await app.register(webhookRoutes, { prefix: '/webhooks' });
 
