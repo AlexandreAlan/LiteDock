@@ -24,7 +24,26 @@ function relativeTime(iso: string): string {
 }
 
 // Abas no padrão do EasyPanel (Source · Environment · Domains · Deployments · Logs · Advanced).
-type Tab = 'source' | 'env' | 'domains' | 'deploys' | 'metrics' | 'logs' | 'advanced';
+type Tab = 'source' | 'env' | 'credentials' | 'domains' | 'deploys' | 'metrics' | 'logs' | 'advanced';
+
+// Mapa de imagem → variável de senha que controla o acesso.
+const CRED_MAP: Record<string, { var: string; user?: string; label: string }> = {
+  'codercom/code-server':   { var: 'PASSWORD',        label: 'Senha do code-server' },
+  'dpage/pgadmin4':         { var: 'PGADMIN_DEFAULT_PASSWORD', user: 'PGADMIN_DEFAULT_EMAIL', label: 'Senha do pgAdmin' },
+  'grafana/grafana':        { var: 'GF_SECURITY_ADMIN_PASSWORD', label: 'Senha admin do Grafana' },
+  'minio/minio':            { var: 'MINIO_ROOT_PASSWORD', user: 'MINIO_ROOT_USER', label: 'Senha root do MinIO' },
+  'quay.io/keycloak':       { var: 'KEYCLOAK_ADMIN_PASSWORD', user: 'KEYCLOAK_ADMIN', label: 'Senha admin do Keycloak' },
+  'photoprism/photoprism':  { var: 'PHOTOPRISM_ADMIN_PASSWORD', label: 'Senha admin do PhotoPrism' },
+  'directus/directus':      { var: 'ADMIN_PASSWORD', label: 'Senha admin do Directus' },
+};
+
+function detectCred(image?: string): { var: string; user?: string; label: string } | null {
+  if (!image) return null;
+  for (const [prefix, info] of Object.entries(CRED_MAP)) {
+    if (image.startsWith(prefix)) return info;
+  }
+  return null;
+}
 
 export function Service() {
   const { id = '' } = useParams();
@@ -109,9 +128,13 @@ export function Service() {
   const isApp = s.type === 'app';
   const deploying = deploy.isPending || isInflight(depQ.data?.status);
 
+  const specImage = (s.spec?.image as string | undefined) || '';
+  const hasCred = !!detectCred(specImage) || (s.envVars ?? []).some((e) => /pass|secret|password/i.test(e.key));
+
   const TABS: { key: Tab; label: string; show: boolean }[] = [
     { key: 'source', label: 'Source', show: isApp },
     { key: 'env', label: 'Environment', show: true },
+    { key: 'credentials', label: 'Credenciais', show: isApp && hasCred },
     { key: 'domains', label: 'Domains', show: true },
     { key: 'deploys', label: 'Deployments', show: true },
     { key: 'metrics', label: 'Métricas', show: true },
@@ -246,6 +269,7 @@ export function Service() {
 
       {tab === 'source' && isApp && <SourceTab s={s} />}
       {tab === 'env' && <EnvTab s={s} />}
+      {tab === 'credentials' && <CredentialsTab s={s} onDeploy={() => deploy.mutate()} />}
       {tab === 'domains' && <DomainsTab s={s} />}
       {tab === 'deploys' && <DeploysTab s={s} live={depQ.data} onRedeploy={() => deploy.mutate()} deploying={deploying} />}
       {tab === 'metrics' && <MetricsTab id={id} />}
@@ -257,6 +281,153 @@ export function Service() {
 
 function Spin() {
   return <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />;
+}
+
+// ── Credenciais de acesso ───────────────────────────────────────────────
+function CredentialsTab({ s, onDeploy }: { s: ServiceFull; onDeploy: () => void }) {
+  const qc = useQueryClient();
+  const specImage = (s.spec?.image as string | undefined) || '';
+  const detected = detectCred(specImage);
+
+  // Env vars que parecem credenciais
+  const credVars = (s.envVars ?? []).filter((e) => /pass|secret|password/i.test(e.key));
+
+  const [newPass, setNewPass] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
+
+  const targetVar = detected?.var ?? 'PASSWORD';
+  const existingVar = credVars.find((e) => e.key === targetVar);
+
+  async function setPassword() {
+    if (!newPass || newPass.length < 6) { setErr('Senha deve ter pelo menos 6 caracteres.'); return; }
+    setErr(''); setBusy(true); setSaved(false);
+    try {
+      if (existingVar) {
+        await api.patch(`/services/${s.id}/env/${encodeURIComponent(targetVar)}`, { value: newPass });
+      } else {
+        await api.post(`/services/${s.id}/env`, { key: targetVar, value: newPass, isSecret: true });
+      }
+      qc.invalidateQueries({ queryKey: ['service', s.id] });
+      setSaved(true);
+      setNewPass('');
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Erro ao salvar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Card principal: definir senha */}
+      <Card
+        title={detected?.label ?? 'Credenciais de acesso'}
+        subtitle={`Variável de ambiente ${targetVar} — controla a senha de acesso ao app.`}
+      >
+        <div className="space-y-4">
+          {/* Usuário (se detectado) */}
+          {detected?.user && (
+            <div className="flex items-center justify-between rounded-lg border border-line bg-panel2 px-4 py-2.5">
+              <span className="text-sm text-muted">Usuário</span>
+              <code className="font-mono text-sm text-ink">
+                {(s.envVars ?? []).find((e) => e.key === detected.user)?.value ?? detected.user}
+              </code>
+            </div>
+          )}
+
+          {/* Status atual da variável */}
+          <div className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${existingVar ? 'border-ok/30 bg-ok/5 text-ok' : 'border-warn/30 bg-warn/5 text-warn'}`}>
+            <Icon name={existingVar ? 'check' : 'info'} className="h-4 w-4 shrink-0" />
+            {existingVar
+              ? `Senha configurada — a variável ${targetVar} está definida.`
+              : `Senha não definida — ${targetVar} não existe ainda. Defina abaixo antes de iniciar.`}
+          </div>
+
+          {/* Formulário de nova senha */}
+          <div>
+            <label className="label mb-1 block">{existingVar ? 'Nova senha' : 'Definir senha'}</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  className="field pr-10 font-mono"
+                  type={showPass ? 'text' : 'password'}
+                  value={newPass}
+                  onChange={(e) => { setNewPass(e.target.value); setSaved(false); setErr(''); }}
+                  placeholder="mínimo 6 caracteres"
+                  onKeyDown={(e) => { if (e.key === 'Enter') setPassword(); }}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted hover:text-ink"
+                  onClick={() => setShowPass((v) => !v)}
+                >
+                  <Icon name={showPass ? 'eyeOff' : 'eye'} className="h-4 w-4" />
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost text-sm shrink-0"
+                title="Gerar senha aleatória"
+                onClick={() => {
+                  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+                  const arr = new Uint8Array(16);
+                  crypto.getRandomValues(arr);
+                  setNewPass(Array.from(arr).map((b) => chars[b % chars.length]).join(''));
+                  setShowPass(true);
+                }}
+              >
+                <Icon name="refresh" className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {err && <ErrorNote message={err} />}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn-brand text-sm" disabled={!newPass || busy} onClick={setPassword}>
+              {busy ? 'Salvando…' : existingVar ? 'Atualizar senha' : 'Definir senha'}
+            </button>
+            {saved && (
+              <span className="flex items-center gap-1.5 text-sm text-ok">
+                <Icon name="check" className="h-4 w-4" /> Salvo — faça Deploy para aplicar
+              </span>
+            )}
+          </div>
+
+          {saved && (
+            <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
+              <p className="mb-2 text-sm text-ink">A senha foi salva. Faça <strong>Deploy</strong> para o container reiniciar com a nova senha.</p>
+              <button className="btn-brand text-sm" onClick={onDeploy}>
+                <Icon name="rocket" className="h-4 w-4" /> Deploy agora
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Outras vars de credencial */}
+      {credVars.length > 0 && (
+        <Card title="Variáveis de credencial existentes" subtitle="Env vars armazenadas criptografadas que controlam o acesso.">
+          <ul className="divide-y divide-line">
+            {credVars.map((e) => (
+              <EnvRow
+                key={e.key}
+                svcId={s.id}
+                envKey={e.key}
+                masked={e.value}
+                isSecret={e.isSecret}
+                onRemoved={() => qc.invalidateQueries({ queryKey: ['service', s.id] })}
+                onUpdated={() => qc.invalidateQueries({ queryKey: ['service', s.id] })}
+              />
+            ))}
+          </ul>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 // ── Source (origem/build) ───────────────────────────────────────────────
