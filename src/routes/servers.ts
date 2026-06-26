@@ -1,10 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { prisma } from '../db.js';
 import { listContainers, engineInfo } from '../services/docker.js';
 import { hostMetrics } from '../services/metrics.js';
 import { containerStats, dockerEvents, storage, startContainer, stopContainer, isManaged } from '../services/monitor.js';
 import { workerGet, workerPost, workerHealth } from '../services/worker.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as { version: string };
+const CURRENT_VERSION = pkg.version;
 
 export default async function serverRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authenticate);
@@ -35,6 +42,9 @@ export default async function serverRoutes(app: FastifyInstance) {
     try { return await workerPost('/system/panel/restart'); }
     catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
   });
+
+  // Versão atual do painel (lida do package.json).
+  app.get('/local/version', async () => ({ version: CURRENT_VERSION }));
 
   // Ping da Docker Engine (versao).
   app.get('/local/engine', async () => engineInfo());
