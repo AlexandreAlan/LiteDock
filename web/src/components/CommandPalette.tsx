@@ -21,7 +21,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Projetos entram na busca (navegar direto), como no EasyPanel.
+  // Projetos e serviços entram na busca (navegar direto), como no EasyPanel.
   const { data: projects } = useQuery({
     queryKey: ['projects'],
     queryFn: () => api.get<Project[]>('/projects'),
@@ -55,7 +55,16 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       icon: '📁',
       run: () => go(`/project/${p.id}`),
     }));
-    return [...base, ...projCmds];
+    const svcCmds: Cmd[] = (projects ?? []).flatMap((p) =>
+      (p.services ?? []).map((s) => ({
+        id: `svc-${s.id}`,
+        label: s.name,
+        hint: p.name,
+        icon: s.type === 'database' ? '🗄️' : '📦',
+        run: () => go(`/service/${s.id}`),
+      })),
+    );
+    return [...base, ...projCmds, ...svcCmds];
   }, [projects, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
