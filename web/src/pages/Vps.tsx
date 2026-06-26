@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ContainerStat, type DockerEvent, type StorageItem } from '../lib/api';
 import { Card } from '../components/Card';
@@ -77,12 +78,23 @@ function ServicesTab() {
     onSettled: () => { setBusy(null); qc.invalidateQueries({ queryKey: ['container-stats'] }); },
   });
 
+  const running = list.filter((c) => c.running).length;
   return (
-    <Card title="Serviços" right={<span className="text-xs text-muted">{list.length}</span>}>
+    <Card
+      title="Serviços"
+      subtitle="Todos os containers no host. Gerenciados pelo LiteDock têm ações disponíveis."
+      right={
+        <span className="text-xs text-muted">
+          <span className="font-semibold text-ok">{running}</span>/{list.length} em execução
+        </span>
+      }
+    >
       {q.isLoading ? (
-        <Spinner />
+        <Spinner label="coletando métricas…" />
+      ) : q.error ? (
+        <ErrorNote message={(q.error as Error).message} />
       ) : list.length === 0 ? (
-        <Empty title="Nenhum container" />
+        <Empty title="Nenhum container" hint="Nenhum container encontrado no host." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -98,23 +110,41 @@ function ServicesTab() {
             </thead>
             <tbody>
               {list.map((c) => (
-                <tr key={c.id} className="border-b border-line/60 last:border-0">
+                <tr key={c.id} className="border-b border-line/60 last:border-0 hover:bg-panel2/40 transition-colors">
                   <td className="py-2.5 pr-3">
-                    <span className="inline-flex items-center gap-2">
-                      <StatusDot state={c.state} />
-                      <span className="text-ink">{c.name}</span>
-                      {c.managed && (
-                        <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-ink">litedock</span>
-                      )}
-                      {c.schedule?.enabled && (c.schedule.startTime || c.schedule.stopTime) && (
-                        <span className="inline-flex items-center gap-1 rounded bg-panel2 px-1.5 py-0.5 text-[10px] text-muted" title="Agendado">
-                          <Icon name="history" className="h-3 w-3" />
-                          {c.schedule.startTime ?? '—'}→{c.schedule.stopTime ?? '—'}
-                        </span>
-                      )}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-2">
+                        <StatusDot state={c.state} />
+                        {c.managed && c.serviceId ? (
+                          <Link
+                            to={`/service/${c.serviceId}`}
+                            className="font-medium text-ink hover:text-brand transition-colors"
+                          >
+                            {c.name}
+                          </Link>
+                        ) : (
+                          <span className="text-ink">{c.name}</span>
+                        )}
+                        {c.managed && (
+                          <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-ink">litedock</span>
+                        )}
+                        {c.schedule?.enabled && (c.schedule.startTime || c.schedule.stopTime) && (
+                          <span className="inline-flex items-center gap-1 rounded bg-panel2 px-1.5 py-0.5 text-[10px] text-muted" title="Agendado">
+                            <Icon name="history" className="h-3 w-3" />
+                            {c.schedule.startTime ?? '—'}→{c.schedule.stopTime ?? '—'}
+                          </span>
+                        )}
+                      </span>
+                      <span className="pl-5 font-mono text-[10px] text-muted/70">{c.id}</span>
+                    </div>
                   </td>
-                  <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? `${c.cpuPct.toFixed(1)} %` : '—'}</td>
+                  <td className="py-2.5 pr-3 text-right tabular-nums">
+                    {c.running ? (
+                      <span className={c.cpuPct > 80 ? 'text-bad' : c.cpuPct > 50 ? 'text-warn' : 'text-muted'}>
+                        {c.cpuPct.toFixed(1)} %
+                      </span>
+                    ) : <span className="text-muted">—</span>}
+                  </td>
                   <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? bytes(c.memBytes) : '—'}</td>
                   <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? bps(c.netInBps) : '—'}</td>
                   <td className="py-2.5 pr-3 text-right tabular-nums text-muted">{c.running ? bps(c.netOutBps) : '—'}</td>
@@ -147,6 +177,15 @@ function ServicesTab() {
                         >
                           <Icon name="history" className="h-3.5 w-3.5" />
                         </button>
+                        {c.serviceId && (
+                          <Link
+                            to={`/service/${c.serviceId}`}
+                            title="Abrir página do serviço"
+                            className="rounded border border-line p-1.5 text-muted hover:bg-panel2 hover:text-brand"
+                          >
+                            <Icon name="externalLink" className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <span
