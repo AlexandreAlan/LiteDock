@@ -56,12 +56,13 @@ export function Project() {
         type,
         spec: type === 'database' ? { engine } : {},
       }),
-    onSuccess: () => {
+    onSuccess: (svc) => {
       qc.invalidateQueries({ queryKey: ['project', id] });
       qc.invalidateQueries({ queryKey: ['projects'] });
       setOpen(false);
       setName('');
       setErr('');
+      navigate(`/service/${svc.id}`);
     },
     onError: (e: unknown) => setErr(e instanceof Error ? e.message : 'Falhou'),
   });
