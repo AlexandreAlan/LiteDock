@@ -12,6 +12,17 @@ import { Spinner, ErrorNote, Empty } from '../components/ui';
 const TERMINAL = ['success', 'failed'];
 const isInflight = (st?: string) => !!st && !TERMINAL.includes(st);
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  return `há ${d}d`;
+}
+
 // Abas no padrão do EasyPanel (Source · Environment · Domains · Deployments · Logs · Advanced).
 type Tab = 'source' | 'env' | 'domains' | 'deploys' | 'metrics' | 'logs' | 'advanced';
 
@@ -145,6 +156,11 @@ export function Service() {
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-3">
               <StatusDot state={deploying ? 'restarting' : s.status} withLabel />
+              {s.deployments && s.deployments.length > 0 && (
+                <span className="text-xs text-muted" title={new Date(s.deployments[0].startedAt).toLocaleString('pt-BR')}>
+                  {relativeTime(s.deployments[0].startedAt)}
+                </span>
+              )}
               {/* URL do serviço (domínio principal) — visível sempre que existir */}
               {s.domains && s.domains.length > 0 && (
                 <a
