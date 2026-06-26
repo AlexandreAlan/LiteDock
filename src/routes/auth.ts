@@ -1,8 +1,28 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { generateSecret, verifyTotp, otpauthUrl } from '../lib/totp.js';
+
+// Rate limiter simples em memória: máx. 10 tentativas por IP por minuto.
+const attempts = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(req: FastifyRequest, reply: any): boolean {
+  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim()
+    ?? req.socket.remoteAddress ?? 'unknown';
+  const now = Date.now();
+  const bucket = attempts.get(ip);
+  if (!bucket || now >= bucket.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  bucket.count++;
+  if (bucket.count > 10) {
+    const retry = Math.ceil((bucket.resetAt - now) / 1000);
+    reply.code(429).send({ error: `Muitas tentativas. Tente novamente em ${retry}s.` });
+    return true;
+  }
+  return false;
+}
 
 const credsSchema = z.object({
   email: z.string().email(),
@@ -40,6 +60,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // Login. Se a conta tiver 2FA ligado, exige o código TOTP de 6 dígitos.
   app.post('/login', async (req, reply) => {
+    if (rateLimit(req, reply)) return;
     const { email, password, code } = z
       .object({ email: z.string().email(), password: z.string().min(1), code: z.string().optional() })
       .parse(req.body);
