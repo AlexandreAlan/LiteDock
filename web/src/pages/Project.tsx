@@ -27,6 +27,17 @@ export function Project() {
   const [engine, setEngine] = useState('postgres');
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const rename = useMutation({
+    mutationFn: () => api.patch(`/projects/${id}`, { name: newName }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project', id] });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      setRenaming(false);
+    },
+  });
 
   const destroy = useMutation({
     mutationFn: () => api.del(`/projects/${id}`),
@@ -64,7 +75,37 @@ export function Project() {
       </div>
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
+        <div className="flex items-center gap-2">
+          {renaming ? (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(e) => { e.preventDefault(); rename.mutate(); }}
+            >
+              <input
+                className="field text-xl font-semibold"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(false); }}
+              />
+              <button type="submit" className="btn-brand text-sm" disabled={!newName.trim() || rename.isPending}>
+                {rename.isPending ? '…' : 'Salvar'}
+              </button>
+              <button type="button" className="btn-ghost text-sm" onClick={() => setRenaming(false)}>Cancelar</button>
+            </form>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
+              <button
+                className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink"
+                title="Renomear projeto"
+                onClick={() => { setNewName(project.name); setRenaming(true); }}
+              >
+                <Icon name="pencil" className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => setNets(true)}><Icon name="globe" className="h-4 w-4" /> Redes</button>
           <button className="btn-ghost" onClick={() => setStore(true)}><Icon name="zap" className="h-4 w-4" /> Templates</button>
@@ -83,6 +124,7 @@ export function Project() {
           </button>
         </div>
       </div>
+      {rename.error && <div className="mt-1"><ErrorNote message={(rename.error as Error).message} /></div>}
 
       {services.length === 0 ? (
         <Empty
@@ -97,18 +139,25 @@ export function Project() {
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((s) => (
-            <Link key={s.id} to={`/service/${s.id}`} className="card flex items-center gap-3 p-4 transition-shadow hover:shadow-pop">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium text-ink">{s.name}</span>
-                  <TypeBadge type={s.type} spec={s.spec} />
+          {services.map((s) => {
+            const primaryDomain = s.domains?.[0];
+            return (
+              <Link key={s.id} to={`/service/${s.id}`} className="card flex items-center gap-3 p-4 transition-shadow hover:shadow-pop">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium text-ink">{s.name}</span>
+                    <TypeBadge type={s.type} spec={s.spec} />
+                  </div>
+                  {primaryDomain ? (
+                    <div className="mt-0.5 truncate text-xs text-brand/70">{primaryDomain.host}</div>
+                  ) : (
+                    <div className="mt-0.5 text-xs text-muted">{s.type === 'app' ? 'app' : 'database'}</div>
+                  )}
                 </div>
-                <div className="mt-0.5 text-xs text-muted">{s.type === 'app' ? 'app' : 'database'}</div>
-              </div>
-              <StatusDot state={s.status} />
-            </Link>
-          ))}
+                <StatusDot state={s.status} />
+              </Link>
+            );
+          })}
         </div>
       )}
 
