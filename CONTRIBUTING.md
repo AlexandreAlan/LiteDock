@@ -45,25 +45,42 @@ O painel estará em **http://localhost:5173** (Vite proxy → API em :8088).
 
 ```
 litedock/
-├── src/                    # API (Fastify + TypeScript)
-│   ├── routes/             # Endpoints HTTP organizados por domínio
-│   ├── services/           # Lógica de negócio (deploy, monitor, Docker…)
-│   └── lib/                # Utilitários (crypto, queue…)
-├── web/src/                # Frontend (React + Vite + Tailwind)
-│   ├── pages/              # Páginas (Projects, Service, Monitor, Settings…)
-│   ├── components/         # Componentes reutilizáveis
-│   └── lib/                # API client, autenticação, demo mode
-├── deploy-worker/          # Worker Python (FastAPI) para builds Git/Nixpacks
-├── prisma/                 # Schema do banco (PostgreSQL)
-└── docs/screenshots/       # Capturas de tela para o README
+├── .github/
+│   ├── workflows/ci.yml        # GitHub Actions: typecheck API + build frontend
+│   └── ISSUE_TEMPLATE/         # Templates de bug report e feature request
+├── src/                        # API (Fastify + TypeScript)
+│   ├── routes/                 # Endpoints HTTP por domínio (auth, services, users…)
+│   ├── services/               # Lógica de negócio (deploy, docker, metrics…)
+│   ├── lib/                    # Utilitários (crypto AES-GCM, queue BullMQ, totp)
+│   ├── config.ts               # Variáveis de ambiente validadas
+│   ├── db.ts                   # Prisma client + bootstrap do servidor local
+│   └── server.ts               # Entry-point Fastify (hooks, rotas, graceful shutdown)
+├── web/src/                    # Frontend (React 18 + Vite + Tailwind + Framer Motion)
+│   ├── pages/                  # Projects, Project, Service, Monitor, Domains,
+│   │                           # Settings, Users, Login
+│   ├── components/             # Layout, Modal, Card, MetricsBar, CommandPalette…
+│   └── lib/                    # api.ts, auth.tsx, demo.ts, theme.tsx, toast.ts
+├── deploy-worker/              # Worker Python (FastAPI) para builds Git + Nixpacks
+├── prisma/schema.prisma        # Modelos de dados + índices PostgreSQL
+├── docs/screenshots/           # Capturas de tela para o README
+├── ecosystem.config.cjs        # Configuração pm2 (API + deploy-worker)
+├── docker-compose.dev.yml      # PostgreSQL + Redis para desenvolvimento local
+└── docker-compose.socket-proxy.yml  # Docker Socket Proxy (segurança)
 ```
 
 ## Fluxo de trabalho
 
 1. **Fork** o repositório e crie uma branch: `git checkout -b feat/minha-feature`
 2. **Implemente** a mudança seguindo os padrões abaixo
-3. **Teste** localmente (frontend e backend)
-4. **Abra um PR** preenchendo o template
+3. **Valide** antes do PR:
+   ```bash
+   # Typecheck da API
+   npm run typecheck
+
+   # Typecheck + build do frontend
+   cd web && npm run typecheck && npm run build
+   ```
+4. **Abra um PR** preenchendo o template — o CI vai rodar automaticamente
 
 ## Padrões de código
 
