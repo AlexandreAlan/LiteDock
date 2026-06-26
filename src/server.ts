@@ -41,6 +41,16 @@ app.decorate('authenticate', async (req, reply) => {
   }
 });
 
+// Cabeçalhos de segurança em todas as respostas da API.
+app.addHook('onSend', (_req, reply, _payload, done) => {
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'DENY');
+  reply.header('X-XSS-Protection', '0');
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  done();
+});
+
 // Erros de validacao Zod -> 400.
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof ZodError) {
