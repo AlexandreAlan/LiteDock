@@ -49,7 +49,7 @@ export default async function authRoutes(app: FastifyInstance) {
     if (await prisma.user.findUnique({ where: { email } }))
       return reply.code(409).send({ error: 'email ja cadastrado' });
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
       data: { email, passwordHash, name, role: 'owner' },
     });
@@ -139,7 +139,7 @@ export default async function authRoutes(app: FastifyInstance) {
         return reply.code(409).send({ error: 'e-mail já cadastrado' });
       data.email = email;
     }
-    if (newPassword) data.passwordHash = await bcrypt.hash(newPassword, 10);
+    if (newPassword) data.passwordHash = await bcrypt.hash(newPassword, 12);
 
     if (!data.email && !data.passwordHash)
       return reply.code(400).send({ error: 'nada para alterar' });
