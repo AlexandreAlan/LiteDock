@@ -259,7 +259,8 @@ function SourceTab({ s }: { s: ServiceFull }) {
             ? { source: 'git', repo, branch, subdir: subdir || undefined, dockerfile: dockerfile || undefined, port: Number(port), image: undefined, credentialId: credentialId || undefined }
             : { source: 'image', image, port: Number(port), repo: undefined },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); toast.success('Source salvo.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   return (
@@ -439,11 +440,13 @@ function DomainsTab({ s }: { s: ServiceFull }) {
   const [port, setPort] = useState(String(specPort || 3000));
   const add = useMutation({
     mutationFn: () => api.post(`/services/${s.id}/domains`, { host, targetPort: Number(port), https: true }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setHost(''); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); setHost(''); toast.success('Domínio adicionado.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const del = useMutation({
     mutationFn: (domainId: string) => api.del(`/services/${s.id}/domains/${domainId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); toast.success('Domínio removido.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   return (
     <Card title="Domains & Proxy" subtitle="Domínios roteados pelo Traefik com HTTPS (Let's Encrypt) automático.">
@@ -600,11 +603,13 @@ function ScheduleCard({ containerName }: { containerName: string }) {
         stopTime: stop || null,
         enabled: true,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['schedule', containerName] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['schedule', containerName] }); toast.success('Agendamento salvo.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   const clear = useMutation({
     mutationFn: () => api.del(`/servers/local/containers/${encodeURIComponent(containerName)}/schedule`),
-    onSuccess: () => { setStart(''); setStop(''); qc.invalidateQueries({ queryKey: ['schedule', containerName] }); },
+    onSuccess: () => { setStart(''); setStop(''); qc.invalidateQueries({ queryKey: ['schedule', containerName] }); toast.success('Agendamento removido.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
 
   return (
@@ -722,7 +727,8 @@ function LimitsCard({ s }: { s: ServiceFull }) {
           },
         },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service', s.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service', s.id] }); toast.success('Limites salvos — valem no próximo deploy.'); },
+    onError: (e: unknown) => toast.error((e as Error).message),
   });
   return (
     <Card
