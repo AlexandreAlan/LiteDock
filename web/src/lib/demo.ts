@@ -460,6 +460,7 @@ function route(method: string, path: string, body: any): unknown {
   ];
 
   // servers / monitor
+  if (rawPath === '/servers/local/version') return { version: '0.6.0' };
   if (rawPath === '/servers/local/metrics') return hostMetrics();
   if (rawPath === '/servers/local/engine') return engineInfo();
   if (rawPath === '/servers/local/container-stats') return containerStats();
