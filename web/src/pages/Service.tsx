@@ -19,7 +19,11 @@ export function Service() {
   const { id = '' } = useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const svc = useQuery({ queryKey: ['service', id], queryFn: () => api.get<ServiceFull>(`/services/${id}`) });
+  const svc = useQuery({
+    queryKey: ['service', id],
+    queryFn: () => api.get<ServiceFull>(`/services/${id}`),
+    refetchInterval: 15000,
+  });
   const [tab, setTab] = useState<Tab>('source');
 
   // ── deploy ao vivo (assíncrono + polling) ─────────────────────────────
