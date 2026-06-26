@@ -96,6 +96,7 @@ export function Service() {
   });
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const rename = useMutation({
     mutationFn: () => api.patch(`/services/${id}`, { name: newName }),
     onSuccess: () => {
@@ -246,11 +247,55 @@ export function Service() {
             {(s.status === 'running' || s.status === 'online') && (
               <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="pause" className="h-4 w-4" /> Stop</button>
             )}
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              title="Excluir serviço"
+              className="btn-ghost text-sm text-bad hover:bg-bad/10 hover:text-bad"
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
           </div>
         </div>
         {lifecycle.error instanceof Error && <div className="mt-3"><ErrorNote message={lifecycle.error.message} /></div>}
         {deploy.error instanceof Error && <div className="mt-3"><ErrorNote message={deploy.error.message} /></div>}
       </div>
+
+      {/* Modal de confirmação de exclusão */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-bad/10 text-bad shrink-0">
+                <Icon name="trash" className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-ink">Excluir serviço</h2>
+                <p className="text-sm text-muted">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="text-sm text-ink mb-6">
+              Tem certeza que deseja excluir <strong className="font-semibold">{s.name}</strong>?
+              O container, volumes e configurações serão removidos permanentemente.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="btn-ghost text-sm"
+                disabled={destroy.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => destroy.mutate()}
+                disabled={destroy.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-bad px-4 py-2 text-sm font-medium text-white shadow-card transition-colors hover:bg-bad/80 disabled:opacity-60"
+              >
+                {destroy.isPending ? 'Excluindo…' : <><Icon name="trash" className="h-4 w-4" /> Excluir definitivamente</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* abas */}
       <div className="flex gap-1 border-b border-line">
