@@ -235,6 +235,44 @@ export default async function serviceRoutes(app: FastifyInstance) {
     }
   });
 
+  // Duplica o serviço: cria uma cópia com o mesmo spec e vars de ambiente no mesmo projeto.
+  app.post('/:id/duplicate', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const s = await loadOwned(req, id);
+    if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+
+    const baseName = `${s.name}-copia`;
+    const server = await prisma.server.findFirst();
+    if (!server) return reply.code(500).send({ error: 'sem servidor registrado' });
+
+    const copy = await prisma.service.create({
+      data: {
+        projectId: s.projectId,
+        serverId: server.id,
+        name: baseName,
+        type: s.type,
+        spec: s.spec as object,
+        status: 'created',
+      },
+    });
+
+    // Copia env vars (segredos já estão cifrados — copiamos o blob cifrado diretamente).
+    if (s.envVars.length > 0) {
+      await prisma.envVar.createMany({
+        data: s.envVars.map((e) => ({
+          serviceId: copy.id,
+          key: e.key,
+          value: e.value,
+          isSecret: e.isSecret,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    reply.code(201);
+    return copy;
+  });
+
   // ---- ciclo de vida ----
   for (const action of ['start', 'stop', 'restart'] as const) {
     app.post(`/:id/${action}`, async (req, reply) => {
