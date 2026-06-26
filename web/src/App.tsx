@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
+import { Toasts } from './components/Toasts';
 import { Login } from './pages/Login';
 import { Projects } from './pages/Projects';
 import { Project } from './pages/Project';
@@ -23,6 +24,8 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 export function App() {
   return (
+    <>
+    <Toasts />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -41,5 +44,6 @@ export function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
