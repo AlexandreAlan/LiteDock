@@ -224,8 +224,8 @@ export function Service() {
             )}
           </div>
         </div>
-        {lifecycle.error && <div className="mt-3"><ErrorNote message={(lifecycle.error as Error).message} /></div>}
-        {deploy.error && <div className="mt-3"><ErrorNote message={(deploy.error as Error).message} /></div>}
+        {lifecycle.error instanceof Error && <div className="mt-3"><ErrorNote message={lifecycle.error.message} /></div>}
+        {deploy.error instanceof Error && <div className="mt-3"><ErrorNote message={deploy.error.message} /></div>}
       </div>
 
       {/* abas */}
@@ -353,7 +353,7 @@ function SourceTab({ s }: { s: ServiceFull }) {
       <div className="mt-4 flex items-center gap-3">
         <button className="btn-brand text-sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Salvando…' : 'Salvar'}</button>
         {save.isSuccess && <span className="text-xs text-ok">Salvo ✓</span>}
-        {save.error && <ErrorNote message={(save.error as Error).message} />}
+        {save.error instanceof Error && <ErrorNote message={save.error.message} />}
       </div>
     </Card>
   );
@@ -590,7 +590,7 @@ function EnvTab({ s }: { s: ServiceFull }) {
         <div className="flex-1"><label className="label mb-1 block">Valor</label><input className="field font-mono" value={v} onChange={(e) => setV(e.target.value)} placeholder="postgres://…" /></div>
         <button className="btn-brand text-sm" disabled={!k || add.isPending} onClick={() => add.mutate()}>{add.isPending ? 'Salvando…' : 'Adicionar'}</button>
       </div>
-      {add.error && <div className="mt-2"><ErrorNote message={(add.error as Error).message} /></div>}
+      {add.error instanceof Error && <div className="mt-2"><ErrorNote message={add.error.message} /></div>}
     </Card>
   );
 }
@@ -634,7 +634,7 @@ function DomainsTab({ s }: { s: ServiceFull }) {
         <div className="w-28"><label className="label mb-1 block">Porta</label><input className="field" value={port} onChange={(e) => setPort(e.target.value)} /></div>
         <button className="btn-brand text-sm" disabled={!host || add.isPending} onClick={() => add.mutate()}>{add.isPending ? 'Adicionando…' : 'Adicionar'}</button>
       </div>
-      {add.error && <div className="mt-3"><ErrorNote message={(add.error as Error).message} /></div>}
+      {add.error instanceof Error && <div className="mt-3"><ErrorNote message={add.error.message} /></div>}
     </Card>
   );
 }
@@ -849,7 +849,7 @@ function ScheduleCard({ containerName }: { containerName: string }) {
               </button>
             )}
             {save.isSuccess && <span className="text-xs text-ok">Salvo ✓</span>}
-            {(save.error || clear.error) && <ErrorNote message={((save.error || clear.error) as Error).message} />}
+            {!!(save.error || clear.error) && <ErrorNote message={((save.error || clear.error) as Error).message} />}
           </div>
         </div>
       )}
@@ -900,7 +900,7 @@ function AdvancedTab({ s, onDestroy, destroying }: { s: ServiceFull; onDestroy: 
         >
           {duplicate.isPending ? 'Duplicando…' : <><Icon name="copy" className="h-4 w-4" /> Duplicar serviço</>}
         </button>
-        {duplicate.error && <div className="mt-2"><ErrorNote message={(duplicate.error as Error).message} /></div>}
+        {duplicate.error instanceof Error && <div className="mt-2"><ErrorNote message={duplicate.error.message} /></div>}
       </Card>
 
       <Card title="Zona de perigo">
@@ -974,7 +974,7 @@ function LimitsCard({ s }: { s: ServiceFull }) {
           {save.isPending ? 'Salvando…' : 'Salvar limites'}
         </button>
         {save.isSuccess && <span className="text-xs text-ok">Salvo ✓ — vale no próximo deploy</span>}
-        {save.error && <ErrorNote message={(save.error as Error).message} />}
+        {save.error instanceof Error && <ErrorNote message={save.error.message} />}
       </div>
     </Card>
   );
