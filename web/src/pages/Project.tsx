@@ -19,6 +19,7 @@ export function Project() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['project', id],
     queryFn: () => api.get<TProject>(`/projects/${id}`),
+    refetchInterval: 30000,
   });
 
   const [open, setOpen] = useState(false);
