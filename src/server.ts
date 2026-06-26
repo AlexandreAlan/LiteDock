@@ -1,8 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import { ZodError } from 'zod';
 import { config } from './config.js';
+
+const _dir = dirname(fileURLToPath(import.meta.url));
+const { version: PKG_VERSION } = JSON.parse(readFileSync(join(_dir, '../package.json'), 'utf8')) as { version: string };
 import { prisma, ensureLocalServer } from './db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
@@ -45,7 +51,7 @@ app.setErrorHandler((err, _req, reply) => {
   return reply.code(e.statusCode ?? 500).send({ error: e.message ?? 'erro interno' });
 });
 
-app.get('/health', async () => ({ ok: true, service: 'litedock', version: '0.9.2' }));
+app.get('/health', async () => ({ ok: true, service: 'litedock', version: PKG_VERSION }));
 
 await app.register(authRoutes, { prefix: '/auth' });
 await app.register(projectRoutes, { prefix: '/projects' });
