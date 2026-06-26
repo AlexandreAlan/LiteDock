@@ -2,6 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 
+async function sendTestWebhook(webhookUrl: string): Promise<void> {
+  const isSlack = webhookUrl.includes('hooks.slack.com');
+  const text = '✅ LiteDock — webhook de notificações configurado com sucesso!';
+  const body = isSlack ? JSON.stringify({ text }) : JSON.stringify({ content: text });
+  const res = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  if (!res.ok) throw new Error(`Webhook retornou ${res.status}`);
+}
+
 // Configurações gerais do painel, guardadas como chave-valor. Só chaves
 // conhecidas são aceitas — evita virar lixeira de dados arbitrários.
 const KEYS = [
@@ -30,6 +38,17 @@ export default async function settingsRoutes(app: FastifyInstance) {
     const out: Record<string, string> = {};
     for (const r of rows) out[r.key] = r.value;
     return out;
+  });
+
+  // Envia uma mensagem de teste para o webhook configurado.
+  app.post('/test-webhook', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { url } = z.object({ url: z.string().url() }).parse(req.body);
+    try {
+      await sendTestWebhook(url);
+      return { ok: true };
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 
   // Upsert parcial: grava só as chaves enviadas.
