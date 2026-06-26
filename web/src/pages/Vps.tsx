@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '../lib/toast';
@@ -68,9 +68,16 @@ function ServicesTab() {
     queryFn: () => api.get<ContainerStat[]>('/servers/local/container-stats'),
     refetchInterval: 5000,
   });
-  const list = q.data ?? [];
+  const allContainers = q.data ?? [];
   const [sched, setSched] = useState<ContainerStat | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const list = useMemo(() => {
+    const q2 = search.trim().toLowerCase();
+    if (!q2) return allContainers;
+    return allContainers.filter((c) => c.name.toLowerCase().includes(q2));
+  }, [allContainers, search]);
 
   const action = useMutation({
     mutationFn: ({ name, op }: { name: string; op: 'start' | 'stop' }) =>
@@ -81,15 +88,26 @@ function ServicesTab() {
     onSettled: () => { setBusy(null); qc.invalidateQueries({ queryKey: ['container-stats'] }); },
   });
 
-  const running = list.filter((c) => c.running).length;
+  const running = allContainers.filter((c) => c.running).length;
   return (
     <Card
       title="Serviços"
       subtitle="Todos os containers no host. Gerenciados pelo LiteDock têm ações disponíveis."
       right={
-        <span className="text-xs text-muted">
-          <span className="font-semibold text-ok">{running}</span>/{list.length} em execução
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted">
+            <span className="font-semibold text-ok">{running}</span>/{allContainers.length} em execução
+          </span>
+          <div className="relative">
+            <Icon name="search" className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              className="field py-1 pl-7 pr-2 text-xs w-40"
+              placeholder="Filtrar…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
       }
     >
       {q.isLoading ? (
