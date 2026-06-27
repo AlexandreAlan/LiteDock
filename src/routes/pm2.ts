@@ -35,7 +35,7 @@ export interface Pm2Proc {
   errLog: string;
 }
 
-function listProcesses(): Pm2Proc[] {
+export function listProcesses(): Pm2Proc[] {
   try {
     const raw = execSync('pm2 jlist', {
       stdio: ['ignore', 'pipe', 'ignore'],
