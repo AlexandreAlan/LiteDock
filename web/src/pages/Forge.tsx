@@ -570,12 +570,6 @@ export function Forge() {
             ))}
           </div>
 
-          <div className="border-t border-line p-2">
-            <div className="rounded-lg bg-brand/10 px-2.5 py-2 text-[10px] text-brand-ink">
-              <span className="font-semibold">IA:</span> no terminal rode{' '}
-              <code className="font-mono">claude</code> ou <code className="font-mono">codex</code>
-            </div>
-          </div>
         </aside>
 
         {/* ── Centro: Editor + Terminal ───────────────────────────────── */}
@@ -636,18 +630,11 @@ export function Forge() {
               {termOpen && (
                 <div className="h-52 shrink-0 border-t border-line bg-[#0d1117]">
                   <div className="flex h-7 items-center border-b border-white/10 bg-[#161b22] px-3">
-                    <span className="text-[11px] font-semibold text-zinc-400">TERMINAL</span>
                     {activeProject && (
-                      <span className="ml-2 text-[10px] text-zinc-600 truncate">{activeProject.path}</span>
+                      <span className="text-[10px] text-zinc-500 truncate">{activeProject.path}</span>
                     )}
-                    <div className="ml-auto flex gap-1">
-                      <button onClick={() => setTermKey((k) => k + 1)}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-white/5 hover:text-zinc-300">
-                        + sessão
-                      </button>
-                      <button onClick={() => setTermOpen(false)}
-                        className="rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-white/5 hover:text-zinc-300">✕</button>
-                    </div>
+                    <button onClick={() => setTermOpen(false)}
+                      className="ml-auto rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-white/5 hover:text-zinc-300">✕</button>
                   </div>
                   <div className="h-[calc(100%-28px)]">
                     <Terminal key={termKey} token={token} />
