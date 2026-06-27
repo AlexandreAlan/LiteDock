@@ -19,7 +19,7 @@ export function Terminal({ token }: Props) {
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       theme: {
-        background: '#0d1117',
+        background: 'transparent',
         foreground: '#e6edf3',
         cursor: '#58a6ff',
         black: '#484f58', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
@@ -29,7 +29,7 @@ export function Terminal({ token }: Props) {
         brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
         selectionBackground: '#264f78',
       },
-      allowTransparency: false,
+      allowTransparency: true,
       scrollback: 5000,
     });
 
