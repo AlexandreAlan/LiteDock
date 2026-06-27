@@ -1,8 +1,9 @@
-// Ferramentas de dev/infra: port map, env manager, cron jobs, disk usage, import e overview.
+// Ferramentas de dev/infra: port map, env manager, cron jobs, disk usage, import, overview e health.
 import type { FastifyInstance } from 'fastify';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { request as httpRequest } from 'node:http';
 import { prisma, ensureLocalServer } from '../db.js';
 import { listContainers, docker } from '../services/docker.js';
 import { listProcesses } from './pm2.js';
@@ -392,5 +393,44 @@ export default async function toolsRoutes(app: FastifyInstance) {
     }
 
     return { imported, skipped, errors };
+  });
+
+  // ─── Health Check: pinga todos os serviços com porta ───────────────────────
+  app.get('/health', { onRequest: [app.authenticate] }, async () => {
+    const portEntries = parsePortMap();
+    // Pega só portas TCP em LISTEN, exclui infra interna (PostgreSQL 54xx, Redis 63xx, etc.)
+    const SKIP_PORTS = new Set([5432, 5433, 5440, 6379, 6380, 6390, 2375]);
+    const targets = portEntries.filter(
+      (p) => p.proto === 'tcp' && p.state === 'LISTEN' && !SKIP_PORTS.has(p.port),
+    );
+
+    function pingHttp(port: number): Promise<{ status: number; ms: number }> {
+      return new Promise((resolve) => {
+        const t0 = Date.now();
+        const req = httpRequest(
+          { hostname: '127.0.0.1', port, path: '/', method: 'GET', timeout: 2000 },
+          (res) => { res.destroy(); resolve({ status: res.statusCode ?? 0, ms: Date.now() - t0 }); },
+        );
+        req.on('error', () => resolve({ status: 0, ms: Date.now() - t0 }));
+        req.on('timeout', () => { req.destroy(); resolve({ status: 0, ms: 2000 }); });
+        req.end();
+      });
+    }
+
+    const results = await Promise.all(
+      targets.map(async (t) => {
+        const { status, ms } = await pingHttp(t.port);
+        return {
+          port: t.port,
+          process: t.process,
+          pid: t.pid,
+          httpStatus: status,
+          ms,
+          ok: status > 0 && status < 500,
+        };
+      }),
+    );
+
+    return { checks: results };
   });
 }
