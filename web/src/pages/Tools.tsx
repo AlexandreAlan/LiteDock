@@ -14,13 +14,19 @@ interface CronEntry { raw: string; schedule: string; command: string; user?: str
 interface EnvEntry { key: string; value: string; comment: boolean; masked?: boolean }
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
-type Tab = 'ports' | 'disk' | 'env' | 'crons';
+type Tab = 'ports' | 'disk' | 'env' | 'crons' | 'health';
 
-const TABS: { id: Tab; label: string; icon: 'globe' | 'server' | 'book' | 'history' }[] = [
-  { id: 'ports', label: 'Port Map',    icon: 'globe' },
-  { id: 'disk',  label: 'Disk Usage',  icon: 'server' },
-  { id: 'env',   label: 'Env Editor',  icon: 'book' },
-  { id: 'crons', label: 'Cron Jobs',   icon: 'history' },
+interface HealthCheck {
+  port: number; process: string | null; pid: number | null;
+  httpStatus: number; ms: number; ok: boolean;
+}
+
+const TABS: { id: Tab; label: string; icon: 'globe' | 'server' | 'book' | 'history' | 'shield' }[] = [
+  { id: 'health', label: 'Health',     icon: 'shield' },
+  { id: 'ports',  label: 'Port Map',   icon: 'globe' },
+  { id: 'disk',   label: 'Disk Usage', icon: 'server' },
+  { id: 'env',    label: 'Env Editor', icon: 'book' },
+  { id: 'crons',  label: 'Cron Jobs',  icon: 'history' },
 ];
 
 // ─── Port Map ─────────────────────────────────────────────────────────────────
@@ -338,16 +344,100 @@ function CronJobs() {
   );
 }
 
+// ─── Health Monitor ──────────────────────────────────────────────────────────
+function HealthMonitor() {
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['tools-health'],
+    queryFn: () => api.get<{ checks: HealthCheck[] }>('/tools/health'),
+    refetchInterval: 30_000,
+  });
+
+  const checks = data?.checks ?? [];
+  const ok = checks.filter((c) => c.ok).length;
+  const fail = checks.filter((c) => !c.ok).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-4 text-sm">
+          {ok > 0 && (
+            <span className="flex items-center gap-1.5 text-ok">
+              <span className="h-2 w-2 rounded-full bg-ok" /> {ok} saudável(is)
+            </span>
+          )}
+          {fail > 0 && (
+            <span className="flex items-center gap-1.5 text-bad">
+              <span className="h-2 w-2 rounded-full bg-bad" /> {fail} com falha
+            </span>
+          )}
+          {checks.length === 0 && !isLoading && (
+            <span className="text-muted">Nenhuma porta HTTP encontrada</span>
+          )}
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:bg-panel2 disabled:opacity-50"
+        >
+          <Icon name="refresh" className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {checks.map((c) => (
+            <div
+              key={c.port}
+              className={`flex items-center gap-4 rounded-xl border p-4 transition-colors ${
+                c.ok ? 'border-ok/20 bg-ok/5' : c.httpStatus === 0 ? 'border-bad/20 bg-bad/5' : 'border-warn/20 bg-warn/5'
+              }`}
+            >
+              <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold ${
+                c.ok ? 'bg-ok/20 text-ok' : c.httpStatus === 0 ? 'bg-bad/20 text-bad' : 'bg-warn/20 text-warn'
+              }`}>
+                {c.httpStatus === 0 ? '✕' : c.httpStatus}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-ink">:{c.port}</span>
+                  {c.process && (
+                    <span className="rounded border border-line bg-panel2 px-1.5 py-0.5 text-[11px] text-muted">
+                      {c.process}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted">
+                  {c.httpStatus === 0 ? 'Sem resposta HTTP' : `HTTP ${c.httpStatus}`}
+                  {c.pid && ` · PID ${c.pid}`}
+                </div>
+              </div>
+              <div className={`text-right font-mono text-sm tabular-nums ${
+                c.ms < 100 ? 'text-ok' : c.ms < 500 ? 'text-warn' : 'text-bad'
+              }`}>
+                {c.ms}ms
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export function Tools() {
-  const [tab, setTab] = useState<Tab>('ports');
+  const [tab, setTab] = useState<Tab>('health');
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-ink">Ferramentas</h2>
         <p className="mt-0.5 text-sm text-muted">
-          Port map, uso de disco, editor de .env e cron jobs do servidor
+          Health check, port map, uso de disco, editor de .env e cron jobs
         </p>
       </div>
 
@@ -371,6 +461,7 @@ export function Tools() {
       </div>
 
       {/* Content */}
+      {tab === 'health' && <HealthMonitor />}
       {tab === 'ports' && <PortMap />}
       {tab === 'disk'  && <DiskUsage />}
       {tab === 'env'   && <EnvEditor />}
