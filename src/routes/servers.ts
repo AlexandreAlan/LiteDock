@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { prisma } from '../db.js';
-import { listContainers, engineInfo } from '../services/docker.js';
+import { listContainers, engineInfo, docker } from '../services/docker.js';
 import { hostMetrics } from '../services/metrics.js';
 import { containerStats, dockerEvents, storage, startContainer, stopContainer, isManaged } from '../services/monitor.js';
 import { workerGet, workerPost, workerHealth } from '../services/worker.js';
@@ -101,5 +101,45 @@ export default async function serverRoutes(app: FastifyInstance) {
     const { name } = req.params as { name: string };
     await prisma.containerSchedule.deleteMany({ where: { containerName: name } });
     return { ok: true };
+  });
+
+  // Logs de qualquer container pelo nome (últimas N linhas, stdout+stderr).
+  app.get('/local/containers/:name/logs', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { name } = req.params as { name: string };
+    const { tail } = req.query as { tail?: string };
+    const lines = Math.min(Number(tail) || 200, 2000);
+    try {
+      const containers = await docker.listContainers({ all: true });
+      const found = containers.find((c) => (c.Names ?? []).some((n) => n.replace(/^\//, '') === name));
+      if (!found) return reply.code(404).send({ error: `Container "${name}" não encontrado` });
+      const c = docker.getContainer(found.Id);
+      const buf = (await c.logs({ stdout: true, stderr: true, tail: lines, timestamps: false })) as unknown as Buffer;
+      // demux do protocolo multiplexado Docker
+      let out = '';
+      let i = 0;
+      while (i + 8 <= buf.length) {
+        const size = buf.readUInt32BE(i + 4);
+        const chunk = buf.slice(i + 8, i + 8 + size).toString('utf8');
+        out += chunk;
+        i += 8 + size;
+      }
+      return { logs: out || buf.toString('utf8') };
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
+
+  // Restart de qualquer container pelo nome.
+  app.post('/local/containers/:name/restart', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { name } = req.params as { name: string };
+    try {
+      const containers = await docker.listContainers({ all: true });
+      const found = containers.find((c) => (c.Names ?? []).some((n) => n.replace(/^\//, '') === name));
+      if (!found) return reply.code(404).send({ error: `Container "${name}" não encontrado` });
+      await docker.getContainer(found.Id).restart();
+      return { ok: true };
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
   });
 }
