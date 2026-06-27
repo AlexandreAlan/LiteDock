@@ -11,9 +11,12 @@ import { DEMO } from '../lib/demo';
 
 const NAV = [
   { to: '/', label: 'Projects', end: true, icon: 'grid' as const },
+  { to: '/pm2', label: 'PM2', icon: 'server' as const },
+  { to: '/tools', label: 'Ferramentas', icon: 'settings' as const },
   { to: '/monitor', label: 'Monitor', icon: 'activity' as const },
   { to: '/activity', label: 'Atividade', icon: 'history' as const },
   { to: '/domains', label: 'Domínios', icon: 'globe' as const },
+  { to: '/forge', label: 'Forge', icon: 'terminal' as const },
   { to: '/settings', label: 'Ajustes', icon: 'settings' as const },
 ];
 const NAV_ADMIN: { to: string; label: string; icon: 'users' }[] = [];
@@ -249,22 +252,26 @@ export function Layout() {
       </aside>
 
       {/* ── Conteúdo ──────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto bg-bg">
+      <main className={`flex flex-col flex-1 bg-bg ${location.pathname === '/forge' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {DEMO && (
           <div className="flex items-center justify-center gap-2 border-b border-brand/30 bg-brand/10 px-4 py-1.5 text-xs font-medium text-brand-ink">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
             Modo demonstração — dados fictícios, nenhum servidor real é afetado
           </div>
         )}
-        <motion.div
-          key={location.pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="px-8 py-7"
-        >
+        {location.pathname === '/forge' ? (
           <Outlet />
-        </motion.div>
+        ) : (
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="px-8 py-7"
+          >
+            <Outlet />
+          </motion.div>
+        )}
       </main>
     </div>
   );
