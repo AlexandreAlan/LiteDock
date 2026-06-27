@@ -497,7 +497,7 @@ export async function reconcileInterruptedDeploys(reason: string): Promise<{ dep
 // mesmo quando containers caem sem passar pelas rotas de lifecycle do LiteDock.
 export async function syncContainerStatuses(): Promise<void> {
   const services = await prisma.service.findMany({
-    where: { containerId: { not: null }, status: { notIn: ['stopped', 'created'] } },
+    where: { containerId: { not: null } },
     select: { id: true, containerId: true, status: true },
   });
   for (const s of services) {
