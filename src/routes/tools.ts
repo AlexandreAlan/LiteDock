@@ -1,8 +1,11 @@
-// Ferramentas de dev/infra: port map, env manager, cron jobs, disk usage.
+// Ferramentas de dev/infra: port map, env manager, cron jobs, disk usage, import e overview.
 import type { FastifyInstance } from 'fastify';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { prisma, ensureLocalServer } from '../db.js';
+import { listContainers, docker } from '../services/docker.js';
+import { listProcesses } from './pm2.js';
 
 // ─── Port Map ──────────────────────────────────────────────────────────────────
 
@@ -261,4 +264,133 @@ export default async function toolsRoutes(app: FastifyInstance) {
       } catch { return { results: [] }; }
     },
   );
+
+  // ─── Overview: snapshot unificado (PM2 + Docker) ───────────────────────────
+  app.get('/overview', { onRequest: [app.authenticate] }, async () => {
+    const [pm2List, dockerList] = await Promise.all([
+      Promise.resolve().then(() => listProcesses()),
+      listContainers().catch(() => [] as Awaited<ReturnType<typeof listContainers>>),
+    ]);
+
+    const portEntries = parsePortMap();
+    const portsByPid = new Map<number, number[]>();
+    for (const p of portEntries) {
+      if (p.pid) {
+        if (!portsByPid.has(p.pid)) portsByPid.set(p.pid, []);
+        portsByPid.get(p.pid)!.push(p.port);
+      }
+    }
+
+    const containerPorts: Record<string, number[]> = {};
+    for (const c of dockerList) {
+      try {
+        const info = await docker.getContainer(c.id).inspect();
+        const bindings = info.HostConfig?.PortBindings ?? {};
+        const ports: number[] = [];
+        for (const binding of Object.values(bindings)) {
+          for (const b of (binding as Array<{ HostPort?: string }>) ?? []) {
+            const port = Number(b.HostPort);
+            if (port) ports.push(port);
+          }
+        }
+        containerPorts[c.name] = ports;
+      } catch { containerPorts[c.name] = []; }
+    }
+
+    const pm2Items = pm2List.map((p) => ({
+      kind: 'pm2' as const,
+      name: p.name,
+      status: p.status,
+      cpu: p.cpu,
+      memory: p.memory,
+      uptime: p.uptime,
+      restarts: p.restarts,
+      cwd: p.cwd,
+      ports: p.pid ? (portsByPid.get(p.pid) ?? []) : [],
+    }));
+
+    const dockerItems = dockerList.map((c) => ({
+      kind: 'docker' as const,
+      name: c.name,
+      image: c.image,
+      status: c.state,
+      managed: c.managed,
+      ports: containerPorts[c.name] ?? [],
+    }));
+
+    return { pm2: pm2Items, docker: dockerItems };
+  });
+
+  // ─── Import-all: registra PM2 + Docker no Prisma ───────────────────────────
+  app.post('/import-all', { onRequest: [app.authenticate] }, async (req) => {
+    const ownerId = req.user.sub;
+    const server = await ensureLocalServer();
+    if (!server) return { imported: 0, skipped: 0, errors: [] as string[] };
+
+    const [pm2List, dockerList] = await Promise.all([
+      Promise.resolve().then(() => listProcesses()),
+      listContainers().catch(() => [] as Awaited<ReturnType<typeof listContainers>>),
+    ]);
+
+    const slugify = (s: string) =>
+      s.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    let imported = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    async function ensureProject(name: string) {
+      const slug = slugify(name);
+      const existing = await prisma.project.findFirst({ where: { ownerId, slug } });
+      if (existing) return existing;
+      return prisma.project.create({ data: { name, slug, ownerId } });
+    }
+
+    for (const p of pm2List) {
+      try {
+        const proj = await ensureProject(p.name);
+        const already = await prisma.service.findFirst({ where: { projectId: proj.id, name: p.name } });
+        if (already) { skipped++; continue; }
+        await prisma.service.create({
+          data: {
+            projectId: proj.id,
+            serverId: server.id,
+            name: p.name,
+            type: 'app',
+            status: p.status === 'online' ? 'running' : 'stopped',
+            spec: { runtime: 'pm2', cwd: p.cwd, script: p.script },
+          },
+        });
+        imported++;
+      } catch (e) { errors.push(`pm2/${p.name}: ${(e as Error).message}`); }
+    }
+
+    const SKIP_INFRA = new Set(['litedock-pg', 'litedock-redis', 'litedock-traefik', 'litedock-docker-proxy']);
+    for (const c of dockerList) {
+      if (SKIP_INFRA.has(c.name)) { skipped++; continue; }
+      try {
+        const projName = c.name
+          .replace(/-\d+$/, '')
+          .replace(/[-_](frontend|backend|api|worker|beat|db|redis|celery)$/, '') || c.name;
+        const proj = await ensureProject(projName);
+        const already = await prisma.service.findFirst({ where: { projectId: proj.id, name: c.name } });
+        if (already) { skipped++; continue; }
+        await prisma.service.create({
+          data: {
+            projectId: proj.id,
+            serverId: server.id,
+            name: c.name,
+            type: 'app',
+            status: c.running ? 'running' : 'stopped',
+            containerId: c.id,
+            spec: { runtime: 'docker', image: c.image, managed: c.managed },
+          },
+        });
+        imported++;
+      } catch (e) { errors.push(`docker/${c.name}: ${(e as Error).message}`); }
+    }
+
+    return { imported, skipped, errors };
+  });
 }
