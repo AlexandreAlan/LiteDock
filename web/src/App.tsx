@@ -14,6 +14,7 @@ import { Activity } from './pages/Activity';
 import { Forge } from './pages/Forge';
 import { Pm2 } from './pages/Pm2';
 import { Tools } from './pages/Tools';
+import { Overview } from './pages/Overview';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -49,6 +50,7 @@ export function App() {
         <Route path="/forge" element={<Forge />} />
         <Route path="/pm2" element={<Pm2 />} />
         <Route path="/tools" element={<Tools />} />
+        <Route path="/overview" element={<Overview />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

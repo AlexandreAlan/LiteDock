@@ -11,6 +11,7 @@ import { DEMO } from '../lib/demo';
 
 const NAV = [
   { to: '/', label: 'Projects', end: true, icon: 'grid' as const },
+  { to: '/overview', label: 'Visão Geral', icon: 'layout' as const },
   { to: '/pm2', label: 'PM2', icon: 'server' as const },
   { to: '/tools', label: 'Ferramentas', icon: 'settings' as const },
   { to: '/monitor', label: 'Monitor', icon: 'activity' as const },
