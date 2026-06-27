@@ -8,6 +8,7 @@ import { MetricsBar } from '../components/MetricsBar';
 import { StatusDot } from '../components/StatusDot';
 import { Icon } from '../components/icons';
 import { Spinner, Empty } from '../components/ui';
+import { PublishWizard } from '../components/PublishWizard';
 
 // Rótulo de tipo sob o nome do serviço (app / postgres / redis / compose…).
 function typeLabel(s: Service): string {
@@ -28,6 +29,7 @@ export function Projects() {
   const [sort, setSort] = useState<Sort>('name');
   const [view, setView] = useState<View>('expanded');
   const [search, setSearch] = useState('');
+  const [wizard, setWizard] = useState(false);
 
   const create = useMutation({
     mutationFn: () => api.post<Project>('/projects', { name }),
@@ -53,6 +55,7 @@ export function Projects() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <MetricsBar />
+      {wizard && <PublishWizard onClose={() => setWizard(false)} />}
 
       {/* cabeçalho + toolbar (estilo EasyPanel) */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -67,6 +70,12 @@ export function Projects() {
           />
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            className="flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/10 px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand/20 transition-colors"
+            onClick={() => setWizard(true)}
+          >
+            <Icon name="rocket" className="h-4 w-4" /> Publicar
+          </button>
           <button className="btn-brand text-sm" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Novo</button>
           <Segmented
             value={sort}
