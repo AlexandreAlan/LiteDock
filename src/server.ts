@@ -21,6 +21,11 @@ import settingsRoutes from './routes/settings.js';
 import userRoutes from './routes/users.js';
 import githubRoutes from './routes/github.js';
 import activityRoutes from './routes/activity.js';
+import studioRoutes from './routes/studio.js';
+import terminalRoutes from './routes/terminal.js';
+import devspaceRoutes from './routes/devspace.js';
+import pm2Routes from './routes/pm2.js';
+import toolsRoutes from './routes/tools.js';
 import { reconcileInterruptedDeploys, syncContainerStatuses } from './services/deploy.js';
 
 // Permite serializar BigInt (ex.: Backup.sizeBytes) como JSON.
@@ -74,6 +79,11 @@ await app.register(settingsRoutes, { prefix: '/settings' });
 await app.register(userRoutes, { prefix: '/users' });
 await app.register(githubRoutes, { prefix: '/github' });
 await app.register(activityRoutes, { prefix: '/activity' });
+await app.register(studioRoutes, { prefix: '/studio' });
+await app.register(terminalRoutes, { prefix: '/terminal' });
+await app.register(devspaceRoutes, { prefix: '/devspace' });
+await app.register(pm2Routes, { prefix: '/pm2' });
+await app.register(toolsRoutes, { prefix: '/tools' });
 // Webhooks de CI/CD: público (autenticado por token do serviço), sem JWT.
 await app.register(webhookRoutes, { prefix: '/webhooks' });
 
