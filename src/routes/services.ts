@@ -310,6 +310,23 @@ export default async function serviceRoutes(app: FastifyInstance) {
     });
   }
 
+  // Move um serviço para outro projeto do mesmo dono.
+  app.patch<{ Params: { id: string }; Body: { projectId: string } }>(
+    '/:id/move',
+    async (req, reply) => {
+      const { id } = req.params;
+      const { projectId } = req.body;
+      const s = await loadOwned(req, id);
+      if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+      const target = await prisma.project.findFirst({ where: { id: projectId, ownerId: req.user.sub } });
+      if (!target) return reply.code(404).send({ error: 'projeto destino não encontrado' });
+      const conflict = await prisma.service.findFirst({ where: { projectId, name: s.name } });
+      if (conflict) return reply.code(409).send({ error: `Já existe um serviço "${s.name}" no projeto "${target.name}"` });
+      await prisma.service.update({ where: { id }, data: { projectId } });
+      return { ok: true };
+    },
+  );
+
   // Remove o serviço (container + registro). Serializado com o deploy.
   app.delete('/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
