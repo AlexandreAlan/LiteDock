@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, getToken } from '../lib/api';
 import { Icon } from '../components/icons';
-import { Terminal } from '../components/Terminal';
 import { toast } from '../lib/toast';
 
 // ─── tipos ───────────────────────────────────────────────────────────────────
@@ -456,6 +455,8 @@ function NewProjectModal({ onClose, onCreate }: {
   );
 }
 
+const STUDIO_URL = 'https://studio.litedock.morenadoaco.com.br';
+
 // ─── Forge principal ─────────────────────────────────────────────────────────
 export function Forge() {
   const token = getToken() ?? '';
@@ -463,17 +464,18 @@ export function Forge() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [editorBust, setEditorBust] = useState(() => Date.now());
-  const [termOpen, setTermOpen] = useState(true);
-  const [termKey, setTermKey] = useState(0);
   const [projectSearch, setProjectSearch] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
   const [showDeploy, setShowDeploy] = useState(false);
+  const [studioReady, setStudioReady] = useState(false);
 
-  const { data: studioData } = useQuery({
-    queryKey: ['studio-url'],
-    queryFn: () => api.get<{ url: string; available: boolean }>('/studio/url'),
-    staleTime: 60_000, retry: false,
-  });
+  // Cria cookie de sessão no studio.litedock via API (Bearer JWT → cookie domain-wide)
+  useEffect(() => {
+    if (!token) return;
+    api.post<{ ok: boolean }>('/studio/session')
+      .then(() => setStudioReady(true))
+      .catch(() => setStudioReady(false));
+  }, [token]);
 
   const { data: projData, isLoading: projLoading } = useQuery({
     queryKey: ['devspace-projects'],
@@ -497,9 +499,8 @@ export function Forge() {
     await qc.invalidateQueries({ queryKey: ['devspace-projects'] });
   };
 
-  const editorSrc = studioData?.url
-    ? `${studioData.url}${studioData.url.includes('?') ? '&' : '?'}${activeProject ? `folder=${activeProject.path}&` : ''}_t=${editorBust}`
-    : null;
+  const folderParam = activeProject ? `?folder=${encodeURIComponent(activeProject.path)}` : '';
+  const editorSrc = studioReady ? `${STUDIO_URL}/${folderParam}` : null;
 
   const projects = (projData?.projects ?? []).filter((p) =>
     p.name.toLowerCase().includes(projectSearch.toLowerCase()),
@@ -599,49 +600,28 @@ export function Forge() {
               <button onClick={reloadEditor} className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink" title="Recarregar editor (Shift+F5)">
                 <Icon name="refresh" className="h-3.5 w-3.5" />
               </button>
-              {studioData?.url && (
-                <a href={activeProject ? `${studioData.url}?folder=${activeProject.path}` : studioData.url}
+              {studioReady && (
+                <a href={`${STUDIO_URL}/${folderParam}`}
                   target="_blank" rel="noreferrer"
                   className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink" title="Abrir em nova aba">
                   <Icon name="externalLink" className="h-3.5 w-3.5" />
                 </a>
               )}
-              <button onClick={() => setTermOpen((o) => !o)}
-                className={`rounded px-2 py-1 text-[10px] font-medium transition-colors ${termOpen ? 'bg-brand/20 text-brand' : 'text-muted hover:bg-panel2 hover:text-ink'}`}>
-                Terminal
-              </button>
             </div>
           </div>
 
-          {/* Editor */}
+          {/* Editor — ocupa todo o espaço vertical */}
           <div className="flex flex-1 overflow-hidden">
-            <div className="flex flex-1 flex-col overflow-hidden">
-              {editorSrc ? (
-                <iframe key={editorBust} ref={iframeRef} src={editorSrc}
-                  className="flex-1 border-0" allow="clipboard-read; clipboard-write" title="Editor" />
-              ) : (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted">
-                  <Icon name="terminal" className="h-10 w-10 opacity-20" />
-                  <p className="text-sm">Workspace não configurado</p>
-                  <p className="text-xs">Acesse Ajustes → studioUrl</p>
-                </div>
-              )}
-
-              {termOpen && (
-                <div className="h-52 shrink-0 border-t border-line bg-[#0d1117]">
-                  <div className="flex h-7 items-center border-b border-white/10 bg-[#161b22] px-3">
-                    {activeProject && (
-                      <span className="text-[10px] text-zinc-500 truncate">{activeProject.path}</span>
-                    )}
-                    <button onClick={() => setTermOpen(false)}
-                      className="ml-auto rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-white/5 hover:text-zinc-300">✕</button>
-                  </div>
-                  <div className="h-[calc(100%-28px)]">
-                    <Terminal key={termKey} token={token} />
-                  </div>
-                </div>
-              )}
-            </div>
+            {editorSrc ? (
+              <iframe key={editorBust} ref={iframeRef} src={editorSrc}
+                className="flex-1 border-0" allow="clipboard-read; clipboard-write; clipboard" title="Forge IDE" />
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted">
+                <Icon name="terminal" className="h-10 w-10 opacity-20" />
+                <p className="text-sm">Iniciando ambiente de desenvolvimento...</p>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+              </div>
+            )}
           </div>
         </div>
       </div>
