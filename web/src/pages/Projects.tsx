@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project, type Service } from '../lib/api';
@@ -10,7 +10,6 @@ import { Icon } from '../components/icons';
 import { Spinner, Empty } from '../components/ui';
 import { PublishWizard } from '../components/PublishWizard';
 
-// Rótulo de tipo sob o nome do serviço (app / postgres / redis / compose…).
 function typeLabel(s: Service): string {
   if (s.type === 'app') return 'app';
   const spec = (s.spec ?? {}) as Record<string, unknown>;
@@ -18,18 +17,59 @@ function typeLabel(s: Service): string {
   return engine.split(':')[0].split('/').pop() || 'database';
 }
 
-type Sort = 'name' | 'time';
 type View = 'expanded' | 'collapsed';
+
+function loadOrder(): string[] {
+  try { return JSON.parse(localStorage.getItem('litedock_proj_order') ?? '[]') as string[]; }
+  catch { return []; }
+}
+function saveOrder(ids: string[]) {
+  localStorage.setItem('litedock_proj_order', JSON.stringify(ids));
+}
+function reorderIds(ids: string[], srcId: string, targetId: string, pos: 'above' | 'below'): string[] {
+  const result = ids.filter((id) => id !== srcId);
+  const tgtIdx = result.indexOf(targetId);
+  result.splice(pos === 'above' ? tgtIdx : tgtIdx + 1, 0, srcId);
+  return result;
+}
 
 export function Projects() {
   const qc = useQueryClient();
-  const { data, isLoading, error } = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/projects'), refetchInterval: 30000 });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.get<Project[]>('/projects'),
+    refetchInterval: 30000,
+  });
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [sort, setSort] = useState<Sort>('name');
   const [view, setView] = useState<View>('expanded');
   const [search, setSearch] = useState('');
   const [wizard, setWizard] = useState(false);
+
+  // ── Reordenar projetos ────────────────────────────────────────────────────
+  const [order, setOrder] = useState<string[]>(loadOrder);
+  const projDragId = useRef<string | null>(null);
+  const [projDragOver, setProjDragOver] = useState<{ id: string; pos: 'above' | 'below' } | null>(null);
+  const [projDragging, setProjDragging] = useState<string | null>(null);
+
+  // ── Mover serviço entre projetos ─────────────────────────────────────────
+  const svcDrag = useRef<{ svcId: string; fromProjectId: string } | null>(null);
+  const [svcDropTarget, setSvcDropTarget] = useState<string | null>(null);
+  const [svcDragging, setSvcDragging] = useState<string | null>(null);
+
+  const projects = useMemo(() => {
+    const list = [...(data ?? [])];
+    const known = order.filter((id) => list.some((p) => p.id === id));
+    const ordered = known.map((id) => list.find((p) => p.id === id)!).filter(Boolean);
+    const remaining = list.filter((p) => !known.includes(p.id));
+    const sorted = [...ordered, ...remaining];
+    if (!search.trim()) return sorted;
+    const q = search.trim().toLowerCase();
+    return sorted.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.services ?? []).some((s) => s.name.toLowerCase().includes(q)),
+    );
+  }, [data, search, order]);
 
   const create = useMutation({
     mutationFn: () => api.post<Project>('/projects', { name }),
@@ -37,27 +77,71 @@ export function Projects() {
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
-  const projects = useMemo(() => {
-    const list = [...(data ?? [])];
-    list.sort((a, b) =>
-      sort === 'name'
-        ? a.name.localeCompare(b.name)
-        : new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
-    );
-    if (!search.trim()) return list;
-    const q = search.trim().toLowerCase();
-    return list.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.services ?? []).some((s) => s.name.toLowerCase().includes(q)),
-    );
-  }, [data, sort, search]);
+  // ── Handlers: reordenar projetos ─────────────────────────────────────────
+  const onProjDragStart = (id: string) => (e: React.DragEvent) => {
+    projDragId.current = id;
+    setProjDragging(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('type', 'project');
+  };
+  const onProjDragOver = (id: string) => (e: React.DragEvent) => {
+    if (svcDrag.current) return;
+    e.preventDefault();
+    if (!projDragId.current || projDragId.current === id) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pos: 'above' | 'below' = e.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
+    if (projDragOver?.id !== id || projDragOver.pos !== pos) setProjDragOver({ id, pos });
+  };
+  const onProjDrop = (targetId: string) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const src = projDragId.current;
+    if (!src || src === targetId) { cleanupProj(); return; }
+    const ids = projects.map((p) => p.id);
+    const newIds = reorderIds(ids, src, targetId, projDragOver?.pos ?? 'below');
+    saveOrder(newIds);
+    setOrder(newIds);
+    cleanupProj();
+  };
+  function cleanupProj() { projDragId.current = null; setProjDragging(null); setProjDragOver(null); }
+
+  // ── Handlers: mover serviço ───────────────────────────────────────────────
+  const onSvcDragStart = (svcId: string, fromProjectId: string) => (e: React.DragEvent) => {
+    e.stopPropagation();
+    svcDrag.current = { svcId, fromProjectId };
+    setSvcDragging(svcId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('svc', svcId);
+  };
+  const onProjDropZoneOver = (projectId: string) => (e: React.DragEvent) => {
+    if (!svcDrag.current || svcDrag.current.fromProjectId === projectId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setSvcDropTarget(projectId);
+  };
+  const onProjDropZoneDrop = (projectId: string) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    const drag = svcDrag.current;
+    if (!drag || drag.fromProjectId === projectId) { cleanupSvc(); return; }
+    try {
+      await api.patch(`/services/${drag.svcId}/move`, { projectId });
+      await qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('Serviço movido.');
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+    cleanupSvc();
+  };
+  const onSvcDragEnd = () => cleanupSvc();
+  function cleanupSvc() { svcDrag.current = null; setSvcDragging(null); setSvcDropTarget(null); }
+
+  const movingService = !!svcDragging;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <MetricsBar />
       {wizard && <PublishWizard onClose={() => setWizard(false)} />}
 
-      {/* cabeçalho + toolbar (estilo EasyPanel) */}
+      {/* cabeçalho + toolbar */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <h2 className="text-xl font-semibold text-ink">Projetos</h2>
         <div className="relative flex-1 sm:max-w-xs">
@@ -76,12 +160,6 @@ export function Projects() {
           >
             <Icon name="rocket" className="h-4 w-4" /> Publicar
           </button>
-          <button className="btn-brand text-sm" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> Novo</button>
-          <Segmented
-            value={sort}
-            onChange={(v) => setSort(v as Sort)}
-            options={[{ v: 'name', label: 'Nome' }, { v: 'time', label: 'Tempo' }]}
-          />
           <Segmented
             value={view}
             onChange={(v) => setView(v as View)}
@@ -90,7 +168,7 @@ export function Projects() {
         </div>
       </div>
 
-      {/* resumo de projetos e serviços */}
+      {/* resumo */}
       {data && data.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted">
           {(() => {
@@ -101,6 +179,11 @@ export function Projects() {
                 <span><span className="font-semibold text-ink">{data.length}</span> projeto{data.length !== 1 ? 's' : ''}</span>
                 <span><span className="font-semibold text-ink">{allSvcs.length}</span> serviço{allSvcs.length !== 1 ? 's' : ''}</span>
                 <span className="text-ok"><span className="font-semibold">{running}</span> rodando</span>
+                {movingService && (
+                  <span className="flex items-center gap-1 text-warn/80 text-xs">
+                    <Icon name="folder" className="h-3.5 w-3.5" /> Solte sobre um projeto para mover
+                  </span>
+                )}
               </>
             );
           })()}
@@ -123,60 +206,142 @@ export function Projects() {
         )
       ) : (
         <div className="space-y-7">
-          {projects.map((p) => (
-            <section key={p.id} className="space-y-3">
-              {/* cabeçalho do projeto */}
-              <div className="flex items-center gap-2">
-                <Link to={`/project/${p.id}`} className="text-base font-semibold text-ink hover:underline">{p.name}</Link>
-                <div className="flex items-center gap-0.5 text-muted">
-                  <Link to={`/project/${p.id}`} title="Abrir projeto" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="folder" className="h-4 w-4" /></Link>
-                  <Link to={`/project/${p.id}`} title="Configurar" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="settings" className="h-4 w-4" /></Link>
-                  <Link to={`/project/${p.id}`} title="Adicionar serviço" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="plus" className="h-4 w-4" /></Link>
-                  <Link to={`/project/${p.id}`} title="Layout" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="layout" className="h-4 w-4" /></Link>
-                </div>
-                <span className="ml-1 text-xs text-muted">
-                  {(() => {
-                    const total = p.services?.length ?? 0;
-                    const running = (p.services ?? []).filter((s) => s.status === 'running' || s.status === 'online').length;
-                    if (total === 0) return '0 serviços';
-                    if (running > 0) return <><span className="text-ok font-semibold">{running}</span>/{total} rodando</>;
-                    return `${total} serviço${total !== 1 ? 's' : ''}`;
-                  })()}
-                </span>
-              </div>
+          {projects.map((p) => {
+            const isProjDragging = projDragging === p.id;
+            const isProjOver = projDragOver?.id === p.id;
+            const isSvcTarget = svcDropTarget === p.id;
+            const isSourceProj = svcDrag.current?.fromProjectId === p.id;
 
-              {/* cards de serviço */}
-              {view === 'expanded' &&
-                ((p.services?.length ?? 0) === 0 ? (
-                  <Link to={`/project/${p.id}`} className="block rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted hover:border-brand/40 hover:text-ink">
-                    + Adicionar serviço
+            return (
+              <section
+                key={p.id}
+                draggable={!movingService}
+                onDragStart={!movingService ? onProjDragStart(p.id) : undefined}
+                onDragOver={!movingService ? onProjDragOver(p.id) : undefined}
+                onDrop={!movingService ? onProjDrop(p.id) : undefined}
+                onDragEnd={cleanupProj}
+                className={[
+                  'space-y-3 rounded-xl p-1 -m-1 select-none transition-all duration-150',
+                  isProjDragging ? 'opacity-40' : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {isProjOver && projDragOver?.pos === 'above' && (
+                  <div className="h-0.5 rounded-full bg-brand" />
+                )}
+
+                {/* cabeçalho */}
+                <div
+                  onDragOver={movingService && !isSourceProj ? onProjDropZoneOver(p.id) : undefined}
+                  onDrop={movingService && !isSourceProj ? onProjDropZoneDrop(p.id) : undefined}
+                  onDragLeave={movingService ? () => setSvcDropTarget(null) : undefined}
+                  className={[
+                    'flex items-center gap-2 rounded-lg px-2 py-1 -mx-2 transition-all duration-150',
+                    isSvcTarget ? 'bg-brand/15 ring-2 ring-brand/40' : '',
+                    !movingService ? 'cursor-grab active:cursor-grabbing' : '',
+                  ].filter(Boolean).join(' ')}
+                >
+                  <Icon name="grip" className="h-4 w-4 shrink-0 text-muted/40 hover:text-muted" />
+                  {isSvcTarget && <Icon name="folder" className="h-4 w-4 shrink-0 text-brand animate-pulse" />}
+                  <Link
+                    to={`/project/${p.id}`}
+                    className="text-base font-semibold text-ink hover:underline"
+                    onClick={(e) => { if (isProjDragging) e.preventDefault(); }}
+                  >
+                    {p.name}
                   </Link>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {p.services!.map((s) => {
-                      const primaryDomain = s.domains?.[0];
-                      return (
-                        <Link
-                          key={s.id}
-                          to={`/service/${s.id}`}
-                          className="card flex items-center justify-between gap-2 p-3.5 transition-shadow hover:shadow-pop"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium text-ink">{s.name}</div>
-                            {primaryDomain ? (
-                              <div className="mt-0.5 truncate text-xs text-brand/70">{primaryDomain.host}</div>
-                            ) : (
-                              <div className="mt-0.5 text-xs text-muted">{typeLabel(s)}</div>
-                            )}
-                          </div>
-                          <StatusDot state={s.status} />
-                        </Link>
-                      );
-                    })}
+                  <div className="flex items-center gap-0.5 text-muted">
+                    <Link to={`/project/${p.id}`} title="Abrir projeto" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="folder" className="h-4 w-4" /></Link>
+                    <Link to={`/project/${p.id}`} title="Configurar" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="settings" className="h-4 w-4" /></Link>
+                    <Link to={`/project/${p.id}`} title="Adicionar serviço" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="plus" className="h-4 w-4" /></Link>
+                    <Link to={`/project/${p.id}`} title="Layout" className="rounded p-1 hover:bg-panel2 hover:text-ink"><Icon name="layout" className="h-4 w-4" /></Link>
                   </div>
-                ))}
-            </section>
-          ))}
+                  <span className="ml-1 text-xs text-muted">
+                    {(() => {
+                      const total = p.services?.length ?? 0;
+                      const running = (p.services ?? []).filter((s) => s.status === 'running' || s.status === 'online').length;
+                      if (total === 0) return '0 serviços';
+                      if (running > 0) return <><span className="text-ok font-semibold">{running}</span>/{total} rodando</>;
+                      return `${total} serviço${total !== 1 ? 's' : ''}`;
+                    })()}
+                  </span>
+                </div>
+
+                {/* cards de serviço */}
+                {view === 'expanded' &&
+                  ((p.services?.length ?? 0) === 0 ? (
+                    <div
+                      onDragOver={movingService && !isSourceProj ? onProjDropZoneOver(p.id) : undefined}
+                      onDrop={movingService && !isSourceProj ? onProjDropZoneDrop(p.id) : undefined}
+                      onDragLeave={movingService ? () => setSvcDropTarget(null) : undefined}
+                      className={[
+                        'rounded-lg border border-dashed px-4 py-5 text-sm text-center text-muted transition-all',
+                        isSvcTarget ? 'border-brand bg-brand/10 text-brand' : 'border-line',
+                      ].join(' ')}
+                    >
+                      {isSvcTarget ? 'Solte aqui para mover o serviço' : '+ Adicionar serviço'}
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={movingService && !isSourceProj ? onProjDropZoneOver(p.id) : undefined}
+                      onDrop={movingService && !isSourceProj ? onProjDropZoneDrop(p.id) : undefined}
+                      onDragLeave={movingService ? () => setSvcDropTarget(null) : undefined}
+                      className={[
+                        'grid gap-3 sm:grid-cols-2 lg:grid-cols-4 rounded-xl p-1 -m-1 transition-all duration-150',
+                        isSvcTarget ? 'ring-2 ring-brand/30 bg-brand/5' : '',
+                      ].join(' ')}
+                    >
+                      {p.services!.map((s) => {
+                        const primaryDomain = s.domains?.[0];
+                        const isDraggingThis = svcDragging === s.id;
+                        return (
+                          <Link
+                            key={s.id}
+                            to={`/service/${s.id}`}
+                            draggable
+                            onDragStart={onSvcDragStart(s.id, p.id)}
+                            onDragEnd={onSvcDragEnd}
+                            className={[
+                              'card flex items-center justify-between gap-2 p-3.5 transition-all hover:shadow-pop',
+                              isDraggingThis ? 'opacity-40 scale-95' : 'cursor-grab active:cursor-grabbing',
+                            ].join(' ')}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium text-ink">{s.name}</div>
+                              {primaryDomain ? (
+                                <div className="mt-0.5 truncate text-xs text-brand/70">{primaryDomain.host}</div>
+                              ) : (
+                                <div className="mt-0.5 text-xs text-muted">{typeLabel(s)}</div>
+                              )}
+                            </div>
+                            <StatusDot state={s.status} />
+                          </Link>
+                        );
+                      })}
+                      {isSvcTarget && (
+                        <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-brand/40 bg-brand/5 p-3.5 text-xs text-brand/70">
+                          Solte aqui
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {isProjOver && projDragOver?.pos === 'below' && (
+                  <div className="h-0.5 rounded-full bg-brand" />
+                )}
+              </section>
+            );
+          })}
+
+          {/* Card "Adicionar novo Projeto" no fim da lista */}
+          {!search && (
+            <button
+              onClick={() => setOpen(true)}
+              className="w-full rounded-xl border border-dashed border-line px-4 py-4 text-sm text-muted hover:border-brand/50 hover:text-brand hover:bg-brand/5 transition-all flex items-center justify-center gap-2"
+            >
+              <Icon name="plus" className="h-4 w-4" />
+              Adicionar novo Projeto
+            </button>
+          )}
         </div>
       )}
 
@@ -203,7 +368,6 @@ export function Projects() {
   );
 }
 
-// Botão segmentado (toggle) no estilo da toolbar do EasyPanel.
 function Segmented({ value, onChange, options }: {
   value: string; onChange: (v: string) => void; options: { v: string; label: string }[];
 }) {
