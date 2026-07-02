@@ -8,12 +8,18 @@ type Name =
   | 'zap' | 'chevronRight' | 'cube' | 'refresh' | 'externalLink' | 'rocket'
   | 'message' | 'history' | 'layout' | 'eye' | 'eyeOff' | 'shield' | 'user'
   | 'chevronDown' | 'copy' | 'check' | 'info' | 'server' | 'docker' | 'pencil'
-  | 'users' | 'terminal';
+  | 'users' | 'terminal'
+  // novos
+  | 'database' | 'git' | 'network' | 'x' | 'cpu' | 'link' | 'filter'
+  | 'download' | 'upload' | 'clock' | 'alert' | 'flame' | 'key'
+  | 'chevronLeft' | 'chevronUp' | 'maximize' | 'minimize' | 'share'
+  | 'wifi' | 'lock' | 'unlock' | 'list' | 'grip';
 
 // Ícones que usam preenchimento (silhueta) em vez de traço.
 const FILLED: Partial<Record<Name, true>> = { play: true, zap: true };
 
 const PATHS: Record<Name, JSX.Element> = {
+  // ── existentes ──────────────────────────────────────────────────────────────
   grid: (<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>),
   activity: (<><path d="M3 3v18h18" /><path d="M7 14v3" /><path d="M12 9v8" /><path d="M17 12v5" /></>),
   globe: (<><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" /></>),
@@ -50,7 +56,33 @@ const PATHS: Record<Name, JSX.Element> = {
   pencil: (<><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></>),
   users: (<><circle cx="9" cy="8" r="4" /><path d="M2 21c0-4 3.1-6 7-6s7 2 7 6" /><path d="M19 8c1.7 0 3 1.3 3 3s-1.3 3-3 3" /><path d="M22 21c0-3-1.3-4.5-3-5" /></>),
   terminal: (<><path d="M4 17l6-6-6-6" /><path d="M12 19h8" /></>),
+  // ── novos ───────────────────────────────────────────────────────────────────
+  database: (<><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 5v4c0 1.7-4 3-9 3s-9-1.3-9-3V5" /><path d="M3 9v5c0 1.7 4 3 9 3s9-1.3 9-3V9" /><path d="M3 14v5c0 1.7 4 3 9 3s9-1.3 9-3v-5" /></>),
+  git: (<><circle cx="6" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><path d="M6 9v6M6 9a6 6 0 0 0 6 6h1a3 3 0 0 1 3 3" /></>),
+  network: (<><rect x="9" y="2" width="6" height="5" rx="1" /><rect x="2" y="17" width="6" height="5" rx="1" /><rect x="16" y="17" width="6" height="5" rx="1" /><path d="M12 7v4M8.5 21H5.5m13 0h-3M4 17v-3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" /></>),
+  x: (<path d="M18 6L6 18M6 6l12 12" />),
+  cpu: (<><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" /></>),
+  link: (<><path d="M10 13a5 5 0 0 0 7.5.7l3-3a5 5 0 0 0-7-7.1l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.7l-3 3a5 5 0 0 0 7 7.1l1.7-1.7" /></>),
+  filter: (<path d="M22 3H2l8 9.5V19l4 2v-8.5z" />),
+  download: (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></>),
+  upload: (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>),
+  clock: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>),
+  alert: (<><path d="M10.3 3.5L2 20h20L13.7 3.5a2 2 0 0 0-3.4 0z" /><path d="M12 10v4M12 17h.01" /></>),
+  flame: (<path d="M8.5 14.5c-.5-2 .5-4 2.5-5.5 0 2 1 3.5 2.5 4.5 0-2 1-3.5 2.5-4.5 1 1.5 1 5-1 7a5 5 0 0 1-6.5-1.5z" />),
+  key: (<><path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 1-7 7 5 5 0 0 1 7-7l7-7" /><path d="M15 7l3 3" /></>),
+  chevronLeft: (<path d="M15 18l-6-6 6-6" />),
+  chevronUp: (<path d="M18 15l-6-6-6 6" />),
+  maximize: (<><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></>),
+  minimize: (<><path d="M8 3v5H3M21 8h-5V3M3 16h5v5M16 21v-5h5" /></>),
+  share: (<><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></>),
+  wifi: (<><path d="M5 12.5a9.5 9.5 0 0 1 14 0" /><path d="M8.5 16a5.5 5.5 0 0 1 7 0" /><circle cx="12" cy="19.5" r="1" /></>),
+  lock: (<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>),
+  unlock: (<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0" /></>),
+  list: (<><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></>),
+  grip: (<><path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" strokeWidth="2.5" strokeLinecap="round" /></>),
 };
+
+export type { Name as IconName };
 
 export function Icon({ name, className = 'h-4 w-4', ...rest }: { name: Name } & SVGProps<SVGSVGElement>) {
   const filled = FILLED[name];
