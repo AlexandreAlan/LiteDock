@@ -15,3 +15,6 @@ __pycache__/
 
 # rascunho por-release (use com gh release create --notes-file)
 docs/_release-notes.md
+
+# Studio (IDE interno) — área interna, não publicada
+studio/
