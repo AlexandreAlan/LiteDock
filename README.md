@@ -54,6 +54,8 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 | **Notificações Discord/Slack** | Webhook configurável em Ajustes → Notificações; botão Testar integrado |
 | **Agendamento** | Liga e desliga containers por horário — configurável na aba Advanced de cada serviço |
 | **Renomear projeto e serviço** | Edição inline com ícone de lápis — slug Docker preservado sem interrupção |
+| **Reordenar projetos** | Arraste e solte na página principal — ordem salva localmente |
+| **Mover serviço entre projetos** | Arraste o card do serviço para outro projeto — bloqueia se já existir serviço com o mesmo nome no destino |
 | **Busca de projetos e serviços** | Filtro em tempo real na página principal (nome do projeto ou serviço) |
 | **Redes entre projetos** | Crie pontes para serviços de projetos diferentes se enxergarem |
 | **Paleta de comandos ⌘K** | Busca rápida por projetos e serviços |
