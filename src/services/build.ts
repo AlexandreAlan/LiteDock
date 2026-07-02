@@ -61,9 +61,9 @@ export interface GitSource {
 }
 
 // Roda um comando transmitindo stdout/stderr linha a linha pro log do deploy.
-function run(cmd: string, args: string[], cwd: string, onLog: LogFn): Promise<void> {
+function run(cmd: string, args: string[], cwd: string, onLog: LogFn, extraEnv?: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { cwd, env: process.env });
+    const p = spawn(cmd, args, { cwd, env: { ...process.env, ...extraEnv } });
     const pipe = (buf: Buffer) => buf.toString('utf8').split('\n').forEach((l) => l && onLog(l));
     p.stdout.on('data', pipe);
     p.stderr.on('data', pipe);
@@ -76,30 +76,48 @@ async function exists(path: string): Promise<boolean> {
   try { await access(path); return true; } catch { return false; }
 }
 
+// Só https:// é aceito como fonte de repositório. spec.repo vem de input do
+// tenant (não validado no schema da rota) e é passado pro `git clone` via
+// spawn — sem essa checagem, um valor como "ext::sh -c ..." faz o próprio
+// Git executar comandos arbitrários no host (transporte `ext::` do git),
+// e não é mitigado por spawn usar array de args (o git interpreta o scheme,
+// não é injeção de shell).
+function assertHttpsRepoUrl(repo: string): void {
+  let u: URL;
+  try {
+    u = new URL(repo);
+  } catch {
+    throw new Error('spec.repo inválido: não é uma URL');
+  }
+  if (u.protocol !== 'https:') {
+    throw new Error(`spec.repo inválido: protocolo "${u.protocol}" não permitido (só https:)`);
+  }
+}
+
 // Injeta o token na URL https pra clonar repo privado, sem logar o segredo.
 function authUrl(repo: string, token?: string): string {
   if (!token) return repo;
-  try {
-    const u = new URL(repo);
-    u.username = 'x-access-token';
-    u.password = token;
-    return u.toString();
-  } catch {
-    return repo;
-  }
+  const u = new URL(repo);
+  u.username = 'x-access-token';
+  u.password = token;
+  return u.toString();
 }
 
 // Clona o repo, escolhe a estratégia e devolve a tag da imagem gerada.
 export async function buildFromGit(imageTag: string, src: GitSource, onLog: LogFn): Promise<string> {
+  assertHttpsRepoUrl(src.repo);
   const work = await mkdtemp(join(tmpdir(), 'litedock-build-'));
   try {
     onLog(`Clonando ${src.repo}${src.branch ? ` (branch ${src.branch})` : ''} ...`);
     const cloneArgs = ['clone', '--depth', '1'];
     if (src.branch) cloneArgs.push('--branch', src.branch);
     cloneArgs.push(authUrl(src.repo, src.token), work);
-    // Filtra o token caso apareça em alguma mensagem de erro do git.
+    // GIT_ALLOW_PROTOCOL: defesa em profundidade — mesmo que a validação
+    // acima seja contornada por algum caminho futuro, o próprio git recusa
+    // qualquer transporte que não seja https.
     await run('git', cloneArgs, process.cwd(), (l) =>
       onLog(src.token ? l.replaceAll(src.token, '***') : l),
+      { GIT_ALLOW_PROTOCOL: 'https' },
     );
 
     const ctx = src.subdir ? join(work, src.subdir) : work;
