@@ -2,6 +2,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# node-pty é addon nativo (node-gyp) — precisa de toolchain de build.
+# Fica só neste estágio; a imagem final (stage 2) não carrega isso.
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 COPY prisma ./prisma
 
