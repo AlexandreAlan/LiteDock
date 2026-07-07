@@ -11,7 +11,7 @@
 # Traefik ignorar. Socket montado read-only (o proxy é quem fala de verdade).
 services:
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
     container_name: litedock-docker-proxy
     restart: unless-stopped
     privileged: false
