@@ -146,18 +146,27 @@ Copie `.env.example` para `.env` e preencha:
 | `PORT` | Porta da API (padrão: `8088`) |
 | `PUBLIC_URL` | URL pública do painel com `/api` (ex: `https://painel.meudominio.com/api`) |
 | `LITEDOCK_DOCKER_PROXY` | Endereço do docker-socket-proxy (padrão: `127.0.0.1:2375`) |
+| `JWT_EXPIRES_IN` | Duração da sessão de login (padrão: `12h`) |
+| `DEPLOY_WORKER_TOKEN` | Segredo compartilhado Node↔Deploy Worker — mesmo valor em `deploy-worker/.env` (`openssl rand -hex 32`) |
 
 ---
 
 ## Segurança por design
 
+- **Sem segredo padrão** — `JWT_SECRET`/`ENCRYPTION_KEY` são obrigatórios; a API recusa subir sem eles configurados
+- **Sessão com expiração + revogação** — JWT expira (`JWT_EXPIRES_IN`) e pode ser revogado antes disso (troca de senha, mudança de papel) sem esperar o token vencer
+- **RBAC com isolamento por tenant** — owner/admin/member; cada usuário só vê/opera os próprios projetos e serviços, checado em toda rota (inclusive as que operam por nome de container Docker)
 - **Docker Socket Proxy** — API do Docker exposta com superfície mínima (sem exec, sem swarm)
-- **Label gate** — só containers `litedock.managed=true` podem ser controlados pelo painel
-- **AES-256-GCM** — variáveis de ambiente criptografadas em repouso
+- **Label gate + rede por projeto** — só containers `litedock.managed=true` são controlados pelo painel; cada projeto tem rede Docker isolada, pontes são opt-in
+- **AES-256-GCM** — variáveis de ambiente e credenciais (ex.: token de GitHub) criptografadas em repouso
+- **Deploy Worker autenticado** — o worker Python (loopback) exige um segredo compartilhado, não confia só na topologia de rede
 - **Limites por container** — CPU/RAM/PIDs configuráveis na GUI (proteção contra abuso)
 - **no-new-privileges** — escalonamento de privilégio bloqueado em todos os deployments
 - **JWT + 2FA TOTP** — autenticação segura com segundo fator opcional
-- **bcrypt (fator 12)** — senhas com hash forte
+- **bcrypt (fator 12), senha mínima de 10 caracteres** — hash forte com custo adequado
+
+Políticas completas (senha, sessão/cookies, controle de acesso, rate
+limiting, segredos, logging) em [`docs/security/`](docs/security/README.md).
 
 ---
 
