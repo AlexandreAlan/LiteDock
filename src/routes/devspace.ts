@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { requireAdminHook } from '../lib/rbac.js';
 
 const WWW = '/var/www';
 
@@ -249,7 +250,7 @@ const SCAFFOLDS: Record<string, { files: Record<string, string>; initCmd?: strin
 };
 
 export default async function devspaceRoutes(app: FastifyInstance) {
-  app.get('/projects', { onRequest: [app.authenticate] }, async () => {
+  app.get('/projects', { onRequest: [app.authenticate, requireAdminHook] }, async () => {
     return { projects: scanProjects() };
   });
 
@@ -264,7 +265,7 @@ export default async function devspaceRoutes(app: FastifyInstance) {
       withReadme?: boolean;
       withEnv?: boolean;
     };
-  }>('/projects', { onRequest: [app.authenticate] }, async (req, reply) => {
+  }>('/projects', { onRequest: [app.authenticate, requireAdminHook] }, async (req, reply) => {
     const { name, template, runtime, withGit = true, withReadme = true, withEnv = false } = req.body;
 
     if (!name || !/^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$/.test(name)) {
@@ -352,7 +353,7 @@ export default async function devspaceRoutes(app: FastifyInstance) {
   // Publica um projeto JÁ EXISTENTE em /var/www (não cria arquivos, só registra)
   app.post<{
     Body: { path: string; name: string; port: number; runtime: 'pm2' | 'container' };
-  }>('/publish', { onRequest: [app.authenticate] }, async (req, reply) => {
+  }>('/publish', { onRequest: [app.authenticate, requireAdminHook] }, async (req, reply) => {
     const { path: projectPath, name, port, runtime } = req.body;
 
     if (!projectPath.startsWith('/var/www/')) {
