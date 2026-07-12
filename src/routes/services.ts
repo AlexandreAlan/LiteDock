@@ -9,9 +9,27 @@ import { docker } from '../services/docker.js';
 import { enqueue } from '../lib/queue.js';
 import { workerDeploy, workerHealth, type WorkerSpec } from '../services/worker.js';
 import { getMetricsHistory } from '../services/monitor.js';
+import { servicesBaseDomain } from '../services/naming.js';
 
 // Chave de lock por serviço: deploy e ciclo de vida do mesmo serviço serializam.
 const lockKey = (id: string) => `deploy:${id}`;
+
+// Hostnames que um tenant NUNCA pode reivindicar como domínio do próprio
+// serviço — são do control plane do LiteDock (painel, Studio/IDE interno). A
+// unicidade em Domain.host (@unique) já impede duas Domain apontarem pro mesmo
+// host, mas ninguém garantia que o host reivindicado não fosse o do PRÓPRIO
+// painel: sem este guard, um tenant conseguiria fazer o Traefik "roteirizar"
+// tráfego do domínio do painel pro container dele (sequestro de tráfego/TLS).
+async function assertNotReservedHost(host: string, req: FastifyRequest): Promise<void> {
+  const h = host.toLowerCase().replace(/\.$/, '');
+  const reserved = new Set<string>([req.hostname.toLowerCase()]);
+  const panelDomain = await prisma.setting.findUnique({ where: { key: 'panelCustomDomain' } });
+  if (panelDomain?.value) reserved.add(panelDomain.value.trim().toLowerCase());
+  const base = (await servicesBaseDomain()).toLowerCase();
+  reserved.add(base); // domínio-base "nu" (sem subdomínio de serviço) é reservado
+  reserved.add(`studio.${base}`); // LiteDock Studio (IDE interno)
+  if (reserved.has(h)) throw new Error(`"${host}" é um domínio reservado do painel`);
+}
 
 // Carrega um serviço garantindo que pertence a um projeto do usuário logado.
 async function loadOwned(req: FastifyRequest, id: string) {
@@ -137,6 +155,11 @@ export default async function serviceRoutes(app: FastifyInstance) {
     const body = z.object({ host: z.string().min(3), targetPort: z.number().int().positive(), https: z.boolean().default(true) }).parse(req.body);
     const s = await loadOwned(req, id);
     if (!s) return reply.code(404).send({ error: 'serviço não encontrado' });
+    try {
+      await assertNotReservedHost(body.host, req);
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
     const exists = await prisma.domain.findUnique({ where: { host: body.host } });
     if (exists) return reply.code(409).send({ error: 'domínio já em uso' });
     reply.code(201);
