@@ -3,11 +3,16 @@
 import type { FastifyInstance } from 'fastify';
 import * as pty from 'node-pty';
 import os from 'node:os';
+import { requireOwnerHook } from '../lib/rbac.js';
 
 export default async function terminalRoutes(app: FastifyInstance) {
   await app.register(import('@fastify/websocket'));
 
-  app.get('/ws', { websocket: true, onRequest: [app.authenticate] }, (socket) => {
+  // Shell real do host — só o owner pode abrir. requireOwnerHook roda como
+  // onRequest (antes do upgrade do WebSocket e antes do PTY ser criado), então
+  // uma negativa nunca chega a spawnar bash: @fastify/websocket só faz o
+  // upgrade/hijack se a reply ainda não tiver sido enviada pelos hooks.
+  app.get('/ws', { websocket: true, onRequest: [app.authenticate, requireOwnerHook] }, (socket) => {
     const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
 
     const term = pty.spawn(shell, [], {
