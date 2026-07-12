@@ -5,7 +5,7 @@
 **Deploy apps com Docker em 30 segundos — sem configurar nada manualmente.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/AlexandreAlan/LiteDock/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/AlexandreAlan/LiteDock/actions)
-[![MIT License](https://img.shields.io/badge/licença-MIT-10b981?style=flat-square)](LICENSE)
+[![PolyForm Shield 1.0.0](https://img.shields.io/badge/licença-PolyForm%20Shield%201.0.0-10b981?style=flat-square)](LICENSE)
 [![Node 20+](https://img.shields.io/badge/node-20+-10b981?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/docker-required-2496ed?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
 [![Demo](https://img.shields.io/badge/demo-ao%20vivo-10b981?style=flat-square)](https://demo.litedock.morenadoaco.com.br)
@@ -183,7 +183,9 @@ Encontrou uma vulnerabilidade? Veja a [**política de segurança**](SECURITY.md)
 
 ## Licença
 
-[MIT](LICENSE) — use, modifique e distribua livremente.
+[PolyForm Shield 1.0.0](LICENSE) — use, modifique e rode livremente (inclusive em empresas).
+A única restrição: não é permitido oferecer o LiteDock, nem uma versão modificada dele,
+como produto ou serviço concorrente sem uma licença comercial. Fora isso, uso liberado.
 
 ---
 
