@@ -112,8 +112,8 @@ cp .env.example .env
 # Banco + cache (desenvolvimento)
 docker compose -f docker-compose.dev.yml up -d
 
-# Migrações
-npx prisma migrate deploy
+# Schema do banco (sem pasta prisma/migrations — aplica o schema.prisma direto)
+npx prisma db push
 
 # API
 pm2 start ecosystem.config.cjs
