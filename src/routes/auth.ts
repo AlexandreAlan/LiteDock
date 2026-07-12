@@ -1,8 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { generateSecret, verifyTotp, otpauthUrl } from '../lib/totp.js';
+
+// Chave sentinela em `Setting` usada como trava atômica de bootstrap (ver
+// `/register` abaixo) — não confundir com as chaves de config expostas em
+// settings.ts (panelCustomDomain, etc.), esta nunca é lida/editada por lá.
+const BOOTSTRAP_LOCK_KEY = 'ownerBootstrapLock';
 
 // Rate limiter simples em memória: máx. 10 tentativas por IP por minuto.
 const attempts = new Map<string, { count: number; resetAt: number }>();
@@ -43,7 +49,17 @@ const updateCredsSchema = z.object({
 
 export default async function authRoutes(app: FastifyInstance) {
   // Registro só no BOOTSTRAP: o 1º usuario vira 'owner'. Depois fecha — novas
-  // contas entram por convite, nunca por cadastro aberto exposto na internet.
+  // contas entram por convite (POST /users, feito por um owner/admin já
+  // logado), nunca por cadastro aberto exposto na internet.
+  //
+  // A contagem de usuários (`total > 0`) sozinha é um TOCTOU: duas requisições
+  // concorrentes durante o boot (antes de existir qualquer usuário) podem
+  // passar pela checagem ao mesmo tempo e criar dois 'owner' distintos. Pra
+  // fechar essa corrida de vez, a criação do owner de bootstrap só é permitida
+  // dentro de uma transação que também insere uma linha sentinela com chave
+  // única em `Setting` — o banco garante que só uma das requisições concorrentes
+  // consegue inserir essa linha; a perdedora recebe violação de unicidade
+  // (P2002) e cai no mesmo "cadastro fechado" das demais.
   app.post('/register', async (req, reply) => {
     const { email, password, name } = credsSchema.parse(req.body);
 
@@ -55,9 +71,22 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: 'email ja cadastrado' });
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { email, passwordHash, name, role: 'owner' },
-    });
+
+    let user;
+    try {
+      user = await prisma.$transaction(async (tx) => {
+        // Trava atômica: só a requisição que conseguir inserir esta linha é
+        // reconhecida como a "primeira de verdade" — resolve o TOCTOU acima.
+        await tx.setting.create({ data: { key: BOOTSTRAP_LOCK_KEY, value: 'true' } });
+        return tx.user.create({ data: { email, passwordHash, name, role: 'owner' } });
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return reply.code(403).send({ error: 'Cadastro fechado. Peça um convite ao administrador.' });
+      }
+      throw err;
+    }
+
     const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role, tv: user.tokenVersion });
     reply.code(201);
     return { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
