@@ -24,16 +24,21 @@ function rateLimit(req: FastifyRequest, reply: any): boolean {
   return false;
 }
 
+// Mínimo 10 — este painel controla infraestrutura real (Docker do host,
+// segredos, deploys); 6 caracteres é fraco demais pra bcrypt sozinho segurar
+// contra um vazamento de hash + ataque offline. Ver docs/security/senhas.md.
+const PASSWORD_MIN = 10;
+
 const credsSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(PASSWORD_MIN, `senha deve ter pelo menos ${PASSWORD_MIN} caracteres`),
   name: z.string().optional(),
 });
 
 const updateCredsSchema = z.object({
   email: z.string().email().optional(),
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(6).optional(),
+  newPassword: z.string().min(PASSWORD_MIN, `senha deve ter pelo menos ${PASSWORD_MIN} caracteres`).optional(),
 });
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -53,7 +58,7 @@ export default async function authRoutes(app: FastifyInstance) {
     const user = await prisma.user.create({
       data: { email, passwordHash, name, role: 'owner' },
     });
-    const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role });
+    const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role, tv: user.tokenVersion });
     reply.code(201);
     return { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
   });
@@ -72,7 +77,7 @@ export default async function authRoutes(app: FastifyInstance) {
       if (!verifyTotp(user.totpSecret, code))
         return reply.code(401).send({ error: 'código de verificação inválido', twoFactor: true });
     }
-    const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role });
+    const token = app.jwt.sign({ sub: user.id, email: user.email, role: user.role, tv: user.tokenVersion });
     return {
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, totpEnabled: user.totpEnabled },
@@ -132,20 +137,27 @@ export default async function authRoutes(app: FastifyInstance) {
     if (!(await bcrypt.compare(currentPassword, user.passwordHash)))
       return reply.code(403).send({ error: 'senha atual incorreta' });
 
-    const data: { email?: string; passwordHash?: string } = {};
+    const data: { email?: string; passwordHash?: string; tokenVersion?: { increment: number } } = {};
     if (email && email !== user.email) {
       const exists = await prisma.user.findUnique({ where: { email } });
       if (exists && exists.id !== user.id)
         return reply.code(409).send({ error: 'e-mail já cadastrado' });
       data.email = email;
     }
-    if (newPassword) data.passwordHash = await bcrypt.hash(newPassword, 12);
+    // Trocar a senha revoga qualquer OUTRA sessão/token já emitido (ex.: se a
+    // troca foi motivada por suspeita de vazamento) — incrementa tokenVersion,
+    // que o decorator `authenticate` compara a cada requisição. Emitimos um
+    // token novo abaixo pra esta mesma sessão continuar funcionando.
+    if (newPassword) {
+      data.passwordHash = await bcrypt.hash(newPassword, 12);
+      data.tokenVersion = { increment: 1 };
+    }
 
     if (!data.email && !data.passwordHash)
       return reply.code(400).send({ error: 'nada para alterar' });
 
     const updated = await prisma.user.update({ where: { id: user.id }, data });
-    const token = app.jwt.sign({ sub: updated.id, email: updated.email, role: updated.role });
+    const token = app.jwt.sign({ sub: updated.id, email: updated.email, role: updated.role, tv: updated.tokenVersion });
     return { token, user: { id: updated.id, email: updated.email, name: updated.name, role: updated.role } };
   });
 }
