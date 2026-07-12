@@ -1,12 +1,13 @@
 // Ferramentas de dev/infra: port map, env manager, cron jobs, disk usage, import, overview e health.
 import type { FastifyInstance } from 'fastify';
-import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { execSync, execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { prisma, ensureLocalServer } from '../db.js';
 import { listContainers, docker } from '../services/docker.js';
 import { listProcesses } from './pm2.js';
+import { requireAdminHook } from '../lib/rbac.js';
 
 // ─── Port Map ──────────────────────────────────────────────────────────────────
 
@@ -98,12 +99,22 @@ function diskUsage(dir: string): DiskEntry[] {
   const safe = resolve('/', dir).replace(/\/$/, '');
   if (!safe.startsWith('/var/www/') && safe !== '/var/www') throw new Error('Fora de /var/www');
   try {
-    const raw = execSync(`/bin/sh -c "du -sh ${JSON.stringify(safe)}/*/  2>/dev/null | sort -rh | head -30"`, {
+    // O glob "*/ " do shell era resolvido listando os subdiretórios aqui, via
+    // fs (não string de shell) — elimina totalmente a necessidade de um shell
+    // pra montar o comando, então nada do valor de "dir" chega a um /bin/sh.
+    const subdirs = readdirSync(safe, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => join(safe, d.name));
+    if (!subdirs.length) return [];
+
+    // execFileSync com args em array: "du" recebe cada path como argv literal,
+    // nunca interpretado por um shell (sem $(...) , crases, ; ou | ativos).
+    const raw = execFileSync('du', ['-sh', ...subdirs], {
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 15_000,
     }).toString();
 
-    return raw.trim().split('\n').filter(Boolean).map((line) => {
+    const entries = raw.trim().split('\n').filter(Boolean).map((line) => {
       const [size, ...rest] = line.split('\t');
       const path = rest.join('\t').trim();
       // converter size para bytes aproximado para ordenação
@@ -116,6 +127,9 @@ function diskUsage(dir: string): DiskEntry[] {
       }
       return { path, size: size ?? '?', bytes };
     });
+
+    // sort -rh | head -30 agora em JS (ordena pelo tamanho já calculado).
+    return entries.sort((a, b) => b.bytes - a.bytes).slice(0, 30);
   } catch { return []; }
 }
 
@@ -174,13 +188,13 @@ function listCrons(): CronEntry[] {
 
 export default async function toolsRoutes(app: FastifyInstance) {
   // GET /tools/ports — mapeamento de portas em uso
-  app.get('/ports', { onRequest: [app.authenticate] }, async () => ({
+  app.get('/ports', { onRequest: [app.authenticate, requireAdminHook] }, async () => ({
     ports: parsePortMap(),
   }));
 
   // GET /tools/disk?dir=/var/www — uso de disco por subdiretório
   app.get<{ Querystring: { dir?: string } }>(
-    '/disk', { onRequest: [app.authenticate] },
+    '/disk', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
       const dir = req.query.dir || '/var/www';
       try {
@@ -192,13 +206,13 @@ export default async function toolsRoutes(app: FastifyInstance) {
   );
 
   // GET /tools/crons — lista cron jobs do sistema
-  app.get('/crons', { onRequest: [app.authenticate] }, async () => ({
+  app.get('/crons', { onRequest: [app.authenticate, requireAdminHook] }, async () => ({
     crons: listCrons(),
   }));
 
   // GET /tools/env?path=/var/www/foo — lê .env (valores de senhas mascarados)
   app.get<{ Querystring: { path?: string } }>(
-    '/env', { onRequest: [app.authenticate] },
+    '/env', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
       if (!req.query.path) return reply.code(400).send({ error: 'path obrigatório' });
       try {
@@ -222,7 +236,7 @@ export default async function toolsRoutes(app: FastifyInstance) {
   // PUT /tools/env — salva .env (requer path no body para segurança)
   app.put<{
     Body: { path: string; entries: Array<{ key: string; value: string; comment: boolean }> };
-  }>('/env', { onRequest: [app.authenticate] }, async (req, reply) => {
+  }>('/env', { onRequest: [app.authenticate, requireAdminHook] }, async (req, reply) => {
     const { path: rawPath, entries } = req.body;
     if (!rawPath || !Array.isArray(entries))
       return reply.code(400).send({ error: 'path e entries são obrigatórios' });
@@ -240,34 +254,44 @@ export default async function toolsRoutes(app: FastifyInstance) {
     }
   });
 
-  // GET /tools/processes/search?q=node — busca por nome de processo no sistema
+  // GET /tools/processes/search?q=node — busca por nome de processo no sistema.
+  // "q" é filtrado por allowlist (defesa em profundidade) mas o ponto central
+  // do fix é que não existe mais shell nenhum: "ps aux" roda via execFileSync
+  // (sem interpretação de metacaracteres) e o filtro por texto é feito em JS,
+  // sem depender de grep.
   app.get<{ Querystring: { q?: string } }>(
-    '/processes/search', { onRequest: [app.authenticate] },
+    '/processes/search', { onRequest: [app.authenticate, requireAdminHook] },
     async (req) => {
       const q = (req.query.q ?? '').replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40);
       if (!q) return { results: [] };
       try {
-        const raw = execSync(`/bin/sh -c "ps aux --no-headers 2>/dev/null | grep -i ${JSON.stringify(q)} | grep -v grep | head -20"`, {
+        const raw = execFileSync('ps', ['aux'], {
           stdio: ['ignore', 'pipe', 'ignore'],
           timeout: 5000,
         }).toString();
-        const results = raw.trim().split('\n').filter(Boolean).map((line) => {
-          const cols = line.trim().split(/\s+/);
-          return {
-            user: cols[0],
-            pid: cols[1],
-            cpu: cols[2],
-            mem: cols[3],
-            cmd: cols.slice(10).join(' '),
-          };
-        });
+        const needle = q.toLowerCase();
+        const results = raw
+          .split('\n')
+          .slice(1) // pula o cabeçalho (USER PID %CPU ...)
+          .filter((line) => line.toLowerCase().includes(needle))
+          .slice(0, 20)
+          .map((line) => {
+            const cols = line.trim().split(/\s+/);
+            return {
+              user: cols[0],
+              pid: cols[1],
+              cpu: cols[2],
+              mem: cols[3],
+              cmd: cols.slice(10).join(' '),
+            };
+          });
         return { results };
       } catch { return { results: [] }; }
     },
   );
 
   // ─── Overview: snapshot unificado (PM2 + Docker) ───────────────────────────
-  app.get('/overview', { onRequest: [app.authenticate] }, async () => {
+  app.get('/overview', { onRequest: [app.authenticate, requireAdminHook] }, async () => {
     const [pm2List, dockerList] = await Promise.all([
       Promise.resolve().then(() => listProcesses()),
       listContainers().catch(() => [] as Awaited<ReturnType<typeof listContainers>>),
@@ -323,7 +347,7 @@ export default async function toolsRoutes(app: FastifyInstance) {
   });
 
   // ─── Import-all: registra PM2 + Docker no Prisma ───────────────────────────
-  app.post('/import-all', { onRequest: [app.authenticate] }, async (req) => {
+  app.post('/import-all', { onRequest: [app.authenticate, requireAdminHook] }, async (req) => {
     const ownerId = req.user.sub;
     const server = await ensureLocalServer();
     if (!server) return { imported: 0, skipped: 0, errors: [] as string[] };
@@ -396,7 +420,7 @@ export default async function toolsRoutes(app: FastifyInstance) {
   });
 
   // ─── Health Check: pinga todos os serviços com porta ───────────────────────
-  app.get('/health', { onRequest: [app.authenticate] }, async () => {
+  app.get('/health', { onRequest: [app.authenticate, requireAdminHook] }, async () => {
     const portEntries = parsePortMap();
     // Pega só portas TCP em LISTEN, exclui infra interna (PostgreSQL 54xx, Redis 63xx, etc.)
     const SKIP_PORTS = new Set([5432, 5433, 5440, 6379, 6380, 6390, 2375]);
