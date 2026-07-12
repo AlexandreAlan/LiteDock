@@ -11,19 +11,53 @@ Para ligar de verdade: SAFE_MODE=false no ambiente.
 
 Roda em loopback (127.0.0.1) — só o backend Node fala com ele.
 """
+import hmac
+import logging
 import os
 import shlex
 import subprocess
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+# Carrega deploy-worker/.env (gitignored, mesmo padrão do .env do Node) —
+# principalmente pra DEPLOY_WORKER_TOKEN, sem precisar exportar env var
+# manualmente antes de subir o pm2. Não sobrescreve vars já exportadas no
+# ambiente (ex.: setadas explicitamente no ecosystem.config.cjs).
+load_dotenv()
 
 SAFE_MODE = os.getenv("SAFE_MODE", "true").lower() != "false"
 NETWORK = os.getenv("TRAEFIK_NETWORK", "litedock")
 PREFIX = os.getenv("CONTAINER_PREFIX", "litedock")
+
+# ── Autenticação (segredo compartilhado com o Node) ─────────────────────────
+# Este worker roda em loopback (127.0.0.1) e por isso nunca teve auth própria
+# — mas a VPS hospeda VÁRIOS produtos como processos independentes no MESMO
+# namespace de rede. Sem este segredo, qualquer outro processo local (de
+# QUALQUER outro produto na mesma VPS) que alcançasse a porta do worker
+# controlaria o Docker do host (deploy de imagem arbitrária, stop/remove de
+# qualquer container, prune, restart do Traefik/painel) sem passar pela
+# autenticação/RBAC do LiteDock. Compara em tempo constante (hmac.compare_digest).
+WORKER_TOKEN = os.getenv("DEPLOY_WORKER_TOKEN", "")
+if not WORKER_TOKEN:
+    logging.warning(
+        "[security] DEPLOY_WORKER_TOKEN não configurado — o worker aceita "
+        "chamadas de QUALQUER processo local sem autenticação. Configure "
+        "DEPLOY_WORKER_TOKEN (mesmo valor no .env do Node) em produção."
+    )
+
+
+def require_token(authorization: Optional[str] = Header(default=None)) -> None:
+    if not WORKER_TOKEN:
+        return  # compat: instalação ainda não gerou o token (ver aviso no boot)
+    expected = f"Bearer {WORKER_TOKEN}"
+    if not authorization or not hmac.compare_digest(authorization, expected):
+        raise HTTPException(401, "token inválido")
+
 
 # Imagem builder efêmera (nixpacks CLI + docker CLI). Construída sob demanda a
 # partir do Dockerfile em nixpacks-builder/. Assim o host NÃO precisa ter o
@@ -95,7 +129,7 @@ def health():
     return {"ok": True, "service": "litedock-deploy-worker", "safeMode": SAFE_MODE}
 
 
-@app.post("/deploy")
+@app.post("/deploy", dependencies=[Depends(require_token)])
 def deploy(spec: ServiceSpec):
     plan = build_plan(spec)
     if SAFE_MODE:
@@ -132,7 +166,7 @@ def deploy(spec: ServiceSpec):
     return {"dryRun": False, "status": "running", "containerId": container.id, "plan": plan}
 
 
-@app.post("/stop")
+@app.post("/stop", dependencies=[Depends(require_token)])
 def stop(ref: TargetRef):
     if SAFE_MODE:
         return {"dryRun": True, "status": "would-stop", "containerId": ref.container_id}
@@ -141,7 +175,7 @@ def stop(ref: TargetRef):
     return {"status": "stopped", "containerId": ref.container_id}
 
 
-@app.post("/remove")
+@app.post("/remove", dependencies=[Depends(require_token)])
 def remove(ref: TargetRef):
     if SAFE_MODE:
         return {"dryRun": True, "status": "would-remove", "containerId": ref.container_id}
@@ -150,7 +184,7 @@ def remove(ref: TargetRef):
     return {"status": "removed", "containerId": ref.container_id}
 
 
-@app.get("/logs")
+@app.get("/logs", dependencies=[Depends(require_token)])
 def logs(container_id: str, tail: int = 200):
     if SAFE_MODE:
         return {"dryRun": True, "logs": "(modo seguro: logs reais desativados)"}
@@ -233,7 +267,7 @@ def _nixpacks_stream(ctx: str, image_tag: str):
     yield (OK_SENTINEL if code == 0 else f"{FAIL_SENTINEL} nixpacks saiu com {code}") + "\n"
 
 
-@app.post("/build/nixpacks")
+@app.post("/build/nixpacks", dependencies=[Depends(require_token)])
 def build_nixpacks(body: NixpacksBuild):
     ctx = os.path.abspath(body.context)
     if not os.path.isdir(ctx):
@@ -262,7 +296,7 @@ def _human(n: int) -> str:
     return f"{f:.1f} TB"
 
 
-@app.get("/system/df")
+@app.get("/system/df", dependencies=[Depends(require_token)])
 def system_df():
     """Uso de disco do Docker (read-only) — seguro."""
     client = _docker()
@@ -281,7 +315,7 @@ def system_df():
     }
 
 
-@app.post("/system/prune")
+@app.post("/system/prune", dependencies=[Depends(require_token)])
 def system_prune():
     """Limpeza SEGURA: remove só imagens dangling (camadas órfãs sem tag) e
     containers parados do LiteDock. Não faz system prune nem remove imagens de
@@ -309,7 +343,7 @@ def system_prune():
     }
 
 
-@app.post("/system/traefik/restart")
+@app.post("/system/traefik/restart", dependencies=[Depends(require_token)])
 def traefik_restart():
     client = _docker()
     try:
@@ -320,7 +354,7 @@ def traefik_restart():
     return {"status": "restarted", "container": TRAEFIK_CONTAINER}
 
 
-@app.get("/system/traefik/logs")
+@app.get("/system/traefik/logs", dependencies=[Depends(require_token)])
 def traefik_logs(tail: int = 200):
     client = _docker()
     try:
@@ -330,7 +364,7 @@ def traefik_logs(tail: int = 200):
     return {"logs": c.logs(tail=tail).decode("utf-8", "replace")}
 
 
-@app.post("/system/panel/restart")
+@app.post("/system/panel/restart", dependencies=[Depends(require_token)])
 def panel_restart():
     """Reinicia o painel (processo pm2). Roda em background com um pequeno
     atraso pra esta resposta conseguir voltar antes do Node cair."""
@@ -393,7 +427,7 @@ class EnsureNet(BaseModel):
     project: str
 
 
-@app.post("/network/ensure")
+@app.post("/network/ensure", dependencies=[Depends(require_token)])
 def network_ensure(body: EnsureNet):
     """Garante a rede do projeto e pluga o Traefik nela (idempotente)."""
     client = _docker()
@@ -412,7 +446,7 @@ class ConnRef(BaseModel):
     network: str
 
 
-@app.post("/network/connect")
+@app.post("/network/connect", dependencies=[Depends(require_token)])
 def network_connect(ref: ConnRef):
     client = _docker()
     net = _ensure_network(client, ref.network)
@@ -420,7 +454,7 @@ def network_connect(ref: ConnRef):
     return {"status": "connected", "container": ref.container, "network": ref.network}
 
 
-@app.post("/network/disconnect")
+@app.post("/network/disconnect", dependencies=[Depends(require_token)])
 def network_disconnect(ref: ConnRef):
     client = _docker()
     try:
@@ -437,7 +471,7 @@ class BridgeRef(BaseModel):
     connected: bool = True
 
 
-@app.post("/network/bridge")
+@app.post("/network/bridge", dependencies=[Depends(require_token)])
 def network_bridge(body: BridgeRef):
     """Liga/desliga a ponte entre dois projetos: cada lado entra (ou sai) da
     rede do outro. Afeta os containers que JÁ existem; novos deploys já sobem
