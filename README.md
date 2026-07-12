@@ -118,6 +118,12 @@ npx prisma migrate deploy
 # API
 pm2 start ecosystem.config.cjs
 
+# Deploy Worker (FastAPI/Python — operações de sistema/Docker)
+cd deploy-worker
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd ..
+pm2 start deploy-worker/ecosystem.config.cjs
+
 # Frontend (build de produção)
 cd web && npm ci && npm run build
 # Sirva web/dist com nginx
