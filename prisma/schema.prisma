@@ -16,6 +16,11 @@ model User {
   role         String       @default("owner") // owner | admin | member
   totpSecret   String? // segredo TOTP (base32) — null = sem 2FA
   totpEnabled  Boolean      @default(false)
+  // Incrementado a cada troca de senha ou revogação manual ("sair de todos os
+  // dispositivos"). O JWT carrega o valor no momento da emissão (`tv`); o
+  // decorator `authenticate` compara com o valor atual no banco a cada
+  // requisição — se divergir, o token foi revogado (mesmo antes de expirar).
+  tokenVersion Int          @default(0)
   createdAt    DateTime     @default(now())
   projects     Project[]
   credentials  Credential[]
