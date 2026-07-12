@@ -36,15 +36,36 @@ import { reconcileInterruptedDeploys, syncContainerStatuses } from './services/d
 const app = Fastify({ logger: { transport: undefined, level: 'info' } });
 
 await app.register(cors, { origin: true });
-await app.register(jwt, { secret: config.jwtSecret });
+// `sign.expiresIn` é o padrão pra todo app.jwt.sign(...) do app (login,
+// registro, troca de credenciais, refresh pós-2FA) — nenhuma rota precisa
+// lembrar de passar expiração na mão.
+await app.register(jwt, { secret: config.jwtSecret, sign: { expiresIn: config.jwtExpiresIn } });
 
-// Decorator de autenticacao.
+// Decorator de autenticacao. Duas camadas:
+//  1) jwtVerify — assinatura + expiração (@fastify/jwt).
+//  2) tokenVersion — o token carrega o valor de User.tokenVersion no momento
+//     em que foi emitido; comparamos com o valor ATUAL no banco. Se divergir
+//     (troca de senha, "sair de todos os dispositivos", ou o admin revogou o
+//     usuário), o token para de funcionar imediatamente, mesmo sem ter
+//     expirado — sem isso, um JWT vazado (ex.: roubado via XSS, já que o
+//     frontend guarda em localStorage) continuaria válido até expirar sozinho.
+// Aproveitamos a mesma consulta pra atualizar req.user.role com o valor FRESCO
+// do banco: se um admin rebaixar alguém, o efeito é imediato na próxima
+// requisição, em vez de esperar o JWT antigo (com o role velho embutido) expirar.
 app.decorate('authenticate', async (req, reply) => {
   try {
     await req.jwtVerify();
   } catch {
-    reply.code(401).send({ error: 'nao autenticado' });
+    return reply.code(401).send({ error: 'nao autenticado' });
   }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: req.user.sub },
+    select: { role: true, tokenVersion: true },
+  });
+  if (!dbUser || dbUser.tokenVersion !== req.user.tv) {
+    return reply.code(401).send({ error: 'sessão expirada — faça login novamente' });
+  }
+  req.user.role = dbUser.role;
 });
 
 // Cabeçalhos de segurança em todas as respostas da API.
