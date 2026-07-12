@@ -1,7 +1,8 @@
 // Gerenciamento de processos PM2 — lista, start/stop/restart/delete, logs.
 import type { FastifyInstance } from 'fastify';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { requireAdminHook } from '../lib/rbac.js';
 
 interface RawProc {
   name: string;
@@ -37,7 +38,7 @@ export interface Pm2Proc {
 
 export function listProcesses(): Pm2Proc[] {
   try {
-    const raw = execSync('pm2 jlist', {
+    const raw = execFileSync('pm2', ['jlist'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 5000,
     }).toString().trim();
@@ -65,14 +66,17 @@ export function listProcesses(): Pm2Proc[] {
   }
 }
 
-function pm2Run(args: string): void {
-  execSync(`pm2 ${args}`, { stdio: 'ignore', timeout: 10_000 });
+// Sempre via execFileSync com args em array — nunca shell=true e nunca string
+// concatenada. Isso elimina qualquer interpretação de metacaracteres de shell
+// (`$( )`, crases, `;`, `|`) que viessem embutidos em campos como "name" ou "cmd".
+function pm2Run(args: string[]): void {
+  execFileSync('pm2', args, { stdio: 'ignore', timeout: 10_000 });
 }
 
 function tailFile(path: string, lines: number): string {
   if (!path || !existsSync(path)) return '';
   try {
-    return execSync(`tail -n ${lines} ${JSON.stringify(path)}`, {
+    return execFileSync('tail', ['-n', String(lines), path], {
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 3000,
     }).toString();
@@ -80,23 +84,25 @@ function tailFile(path: string, lines: number): string {
 }
 
 export default async function pm2Routes(app: FastifyInstance) {
+  // Todas as rotas de pm2.ts controlam processos do HOST (qualquer app na VPS,
+  // não só do tenant do usuário) — restritas a owner/admin.
   // Listar todos os processos
-  app.get('/processes', { onRequest: [app.authenticate] }, async () => ({
+  app.get('/processes', { onRequest: [app.authenticate, requireAdminHook] }, async () => ({
     processes: listProcesses(),
   }));
 
   // Iniciar novo processo
   app.post<{
     Body: { name: string; cmd: string; cwd: string };
-  }>('/processes', { onRequest: [app.authenticate] }, async (req, reply) => {
+  }>('/processes', { onRequest: [app.authenticate, requireAdminHook] }, async (req, reply) => {
     const { name, cmd, cwd } = req.body;
     if (!name?.trim() || !cmd?.trim() || !cwd?.trim())
       return reply.code(400).send({ error: 'name, cmd e cwd são obrigatórios' });
     if (!existsSync(cwd))
       return reply.code(400).send({ error: `Diretório não encontrado: ${cwd}` });
     try {
-      pm2Run(`start ${JSON.stringify(cmd)} --name ${JSON.stringify(name)} --cwd ${JSON.stringify(cwd)}`);
-      try { pm2Run('save'); } catch { /* ignora */ }
+      pm2Run(['start', cmd, '--name', name, '--cwd', cwd]);
+      try { pm2Run(['save']); } catch { /* ignora */ }
       return { ok: true };
     } catch (e) {
       return reply.code(500).send({ error: (e as Error).message });
@@ -105,38 +111,38 @@ export default async function pm2Routes(app: FastifyInstance) {
 
   // Restart
   app.post<{ Params: { name: string } }>(
-    '/:name/restart', { onRequest: [app.authenticate] },
+    '/:name/restart', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
-      try { pm2Run(`restart ${JSON.stringify(req.params.name)}`); return { ok: true }; }
+      try { pm2Run(['restart', req.params.name]); return { ok: true }; }
       catch (e) { return reply.code(500).send({ error: (e as Error).message }); }
     },
   );
 
   // Stop
   app.post<{ Params: { name: string } }>(
-    '/:name/stop', { onRequest: [app.authenticate] },
+    '/:name/stop', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
-      try { pm2Run(`stop ${JSON.stringify(req.params.name)}`); return { ok: true }; }
+      try { pm2Run(['stop', req.params.name]); return { ok: true }; }
       catch (e) { return reply.code(500).send({ error: (e as Error).message }); }
     },
   );
 
   // Start (retoma processo parado)
   app.post<{ Params: { name: string } }>(
-    '/:name/start', { onRequest: [app.authenticate] },
+    '/:name/start', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
-      try { pm2Run(`start ${JSON.stringify(req.params.name)}`); return { ok: true }; }
+      try { pm2Run(['start', req.params.name]); return { ok: true }; }
       catch (e) { return reply.code(500).send({ error: (e as Error).message }); }
     },
   );
 
   // Delete (remove do PM2 permanentemente)
   app.delete<{ Params: { name: string } }>(
-    '/:name', { onRequest: [app.authenticate] },
+    '/:name', { onRequest: [app.authenticate, requireAdminHook] },
     async (req, reply) => {
       try {
-        pm2Run(`delete ${JSON.stringify(req.params.name)}`);
-        try { pm2Run('save'); } catch { /* ignora */ }
+        pm2Run(['delete', req.params.name]);
+        try { pm2Run(['save']); } catch { /* ignora */ }
         return { ok: true };
       } catch (e) { return reply.code(500).send({ error: (e as Error).message }); }
     },
@@ -144,7 +150,7 @@ export default async function pm2Routes(app: FastifyInstance) {
 
   // Logs — últimas N linhas de stdout + stderr
   app.get<{ Params: { name: string }; Querystring: { lines?: string } }>(
-    '/:name/logs', { onRequest: [app.authenticate] },
+    '/:name/logs', { onRequest: [app.authenticate, requireAdminHook] },
     async (req) => {
       const lines = Math.min(Number(req.query.lines) || 200, 1000);
       const proc = listProcesses().find((p) => p.name === req.params.name);
