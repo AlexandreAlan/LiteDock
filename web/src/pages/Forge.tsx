@@ -455,7 +455,7 @@ function NewProjectModal({ onClose, onCreate }: {
   );
 }
 
-const STUDIO_URL = 'https://studio.litedock.morenadoaco.com.br';
+const STUDIO_URL = 'https://litedock.morenadoaco.com.br:8443';
 
 // ─── Forge principal ─────────────────────────────────────────────────────────
 export function Forge() {
