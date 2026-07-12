@@ -10,7 +10,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { config } from '../config.js';
 
 type LogFn = (line: string) => void;
@@ -24,7 +24,13 @@ const NIXPACKS_FAIL = '__LITEDOCK_NIXPACKS_FAIL__';
 async function buildNixpacksViaWorker(imageTag: string, ctx: string, onLog: LogFn): Promise<void> {
   const res = await fetch(`${config.deployWorkerUrl}/build/nixpacks`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      // Mesmo segredo compartilhado das demais chamadas ao worker (ver
+      // services/worker.ts) — este fetch é direto (streaming), não passa
+      // pelo helper `call()`.
+      ...(config.deployWorkerToken ? { Authorization: `Bearer ${config.deployWorkerToken}` } : {}),
+    },
     body: JSON.stringify({ context: ctx, image_tag: imageTag }),
   });
   if (!res.ok || !res.body) {
@@ -94,6 +100,22 @@ function assertHttpsRepoUrl(repo: string): void {
   }
 }
 
+// `spec.subdir` e `spec.dockerfile` também vêm de input do tenant (não
+// validado no schema da rota, igual `spec.repo`) e viram argumento de
+// `join()` pro contexto/arquivo do build. Sem conter o resultado dentro do
+// checkout (`base`), um valor como "../../../../etc" faria o `docker build`
+// ler arquivos arbitrários do HOST (fora do clone temporário) — inclusive de
+// OUTROS tenants ou segredos do próprio painel — e empacotá-los na imagem que
+// o tenant acabou de ganhar permissão de rodar/inspecionar.
+function safeJoin(base: string, rel: string, label: string): string {
+  const baseResolved = resolve(base);
+  const target = resolve(baseResolved, rel);
+  if (target !== baseResolved && !target.startsWith(baseResolved + sep)) {
+    throw new Error(`spec.${label} inválido: sai do diretório do checkout`);
+  }
+  return target;
+}
+
 // Injeta o token na URL https pra clonar repo privado, sem logar o segredo.
 function authUrl(repo: string, token?: string): string {
   if (!token) return repo;
@@ -120,8 +142,8 @@ export async function buildFromGit(imageTag: string, src: GitSource, onLog: LogF
       { GIT_ALLOW_PROTOCOL: 'https' },
     );
 
-    const ctx = src.subdir ? join(work, src.subdir) : work;
-    const dockerfile = join(ctx, src.dockerfile || 'Dockerfile');
+    const ctx = src.subdir ? safeJoin(work, src.subdir, 'subdir') : work;
+    const dockerfile = safeJoin(ctx, src.dockerfile || 'Dockerfile', 'dockerfile');
 
     if (await exists(dockerfile)) {
       onLog('Dockerfile encontrado → docker build');
