@@ -158,6 +158,7 @@ Copie `.env.example` para `.env` e preencha:
 - **RBAC com isolamento por tenant** — owner/admin/member; cada usuário só vê/opera os próprios projetos e serviços, checado em toda rota (inclusive as que operam por nome de container Docker)
 - **Docker Socket Proxy** — API do Docker exposta com superfície mínima (sem exec, sem swarm)
 - **Label gate + rede por projeto** — só containers `litedock.managed=true` são controlados pelo painel; cada projeto tem rede Docker isolada, pontes são opt-in
+- **Sem órfãos ao apagar projeto** — containers dos serviços e a rede do projeto são removidos antes do registro no banco; nada fica rodando/exposto sem aparecer no painel
 - **AES-256-GCM** — variáveis de ambiente e credenciais (ex.: token de GitHub) criptografadas em repouso
 - **Deploy Worker autenticado** — o worker Python (loopback) exige um segredo compartilhado, não confia só na topologia de rede
 - **Limites por container** — CPU/RAM/PIDs configuráveis na GUI (proteção contra abuso)
