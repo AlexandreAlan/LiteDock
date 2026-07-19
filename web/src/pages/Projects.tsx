@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Project, type Service } from '../lib/api';
 import { toast } from '../lib/toast';
@@ -35,6 +35,7 @@ function reorderIds(ids: string[], srcId: string, targetId: string, pos: 'above'
 
 export function Projects() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { data, isLoading, error } = useQuery({
     queryKey: ['projects'],
     queryFn: () => api.get<Project[]>('/projects'),
@@ -73,7 +74,13 @@ export function Projects() {
 
   const create = useMutation({
     mutationFn: () => api.post<Project>('/projects', { name }),
-    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['projects'] }); setOpen(false); setName(''); toast.success(`Projeto "${p.name}" criado.`); },
+    onSuccess: (p) => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      setOpen(false);
+      setName('');
+      toast.success(`Projeto "${p.name}" criado.`);
+      navigate(`/project/${p.id}`);
+    },
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
