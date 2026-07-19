@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, ensureLocalServer } from '../db.js';
 import { bridgeProjects } from '../services/worker.js';
+import * as deploy from '../services/deploy.js';
 
 const slugify = (s: string) =>
   s.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -51,11 +52,36 @@ export default async function projectRoutes(app: FastifyInstance) {
     return prisma.project.update({ where: { id }, data: { name } });
   });
 
-  // Remove um projeto (e seus serviços, em cascata no banco).
+  // Remove um projeto: primeiro os containers Docker de cada serviço e a rede
+  // isolada do projeto, só então o registro no banco (cascata cuida dos
+  // serviços/domínios/env vars relacionados). Sem isto, os containers e a
+  // rede `litedock-net-<slug>` ficam órfãos — rodando, expostos na internet
+  // via Traefik/subdomínio, e invisíveis no painel (o projeto já sumiu do
+  // banco). Erro ao remover UM container não trava os demais nem impede a
+  // limpeza da rede/exclusão do projeto — só loga (idempotência: melhor
+  // terminar a operação do usuário com alguma sobra rastreável no log/`docker
+  // ps` do que travar a exclusão por causa de um container que já não existe).
   app.delete('/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const project = await prisma.project.findFirst({ where: { id, ownerId: req.user.sub } });
+    const project = await prisma.project.findFirst({
+      where: { id, ownerId: req.user.sub },
+      include: { services: true },
+    });
     if (!project) return reply.code(404).send({ error: 'projeto nao encontrado' });
+
+    for (const s of project.services) {
+      try {
+        await deploy.removeContainer(s.containerId);
+      } catch (e) {
+        req.log.error({ err: e, serviceId: s.id }, 'falha ao remover container do serviço ao apagar o projeto');
+      }
+    }
+    try {
+      await deploy.removeProjectNetwork(project.slug);
+    } catch (e) {
+      req.log.error({ err: e, projectId: id }, 'falha ao remover a rede do projeto');
+    }
+
     await prisma.project.delete({ where: { id } });
     return { removed: id };
   });
