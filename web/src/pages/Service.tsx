@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '../lib/toast';
-import { api, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
+import { api, ApiError, type Deployment, type DeployStart, type ServiceFull, type WebhookInfo } from '../lib/api';
 import { Card } from '../components/Card';
 import { StatusDot } from '../components/StatusDot';
 import { TypeBadge } from '../components/badges';
@@ -84,10 +84,34 @@ export function Service() {
     onSuccess: (r) => { setActiveDep(r.deploymentId); setTab('deploys'); toast.info('Deploy iniciado — acompanhe o log abaixo.'); },
     onError: (e: unknown) => toast.error((e as Error).message),
   });
+  const lifecycleLabel = (action: 'start' | 'stop' | 'restart') =>
+    action === 'start' ? 'iniciado' : action === 'stop' ? 'parado' : 'reiniciado';
   const lifecycle = useMutation({
     mutationFn: (action: 'start' | 'stop' | 'restart') => api.post(`/services/${id}/${action}`),
-    onSuccess: (_d, action) => { qc.invalidateQueries({ queryKey: ['service', id] }); toast.success(`Container ${action === 'start' ? 'iniciado' : action === 'stop' ? 'parado' : 'reiniciado'}.`); },
-    onError: (e: unknown) => toast.error((e as Error).message),
+    onSuccess: (_d, action) => { qc.invalidateQueries({ queryKey: ['service', id] }); toast.success(`Container ${lifecycleLabel(action)}.`); },
+    onError: async (e: unknown, action) => {
+      // Uma falha de rede (ex.: "Failed to fetch") na requisição não é garantia de que
+      // a ação não aconteceu — o backend processa o start/stop/restart de forma
+      // independente da conexão do navegador seguir de pé. Antes de assustar o
+      // usuário com um erro falso-positivo, confere o estado real do serviço; se ele
+      // já reflete o resultado esperado, trata como sucesso em vez de erro.
+      if (!(e instanceof ApiError)) {
+        try {
+          const fresh = await api.get<ServiceFull>(`/services/${id}`);
+          qc.setQueryData(['service', id], fresh);
+          const running = fresh.status === 'running' || fresh.status === 'online';
+          const matchesExpected = action === 'stop' ? !running : running;
+          if (matchesExpected) {
+            toast.success(`Container ${lifecycleLabel(action)}.`);
+            lifecycle.reset(); // limpa o estado de erro da mutation — a ação deu certo
+            return;
+          }
+        } catch {
+          /* não deu pra confirmar o estado real — segue para o toast de erro abaixo */
+        }
+      }
+      toast.error((e as Error).message);
+    },
   });
   const destroy = useMutation({
     mutationFn: () => api.del(`/services/${id}`),
@@ -238,14 +262,14 @@ export function Service() {
               </button>
             )}
             {s.status === 'running' || s.status === 'online' ? (
-              <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="rotate" className="h-4 w-4" /> Restart</button>
+              <button onClick={() => lifecycle.mutate('restart')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="rotate" className="h-4 w-4" /> Reiniciar</button>
             ) : s.containerId ? (
-              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="play" className="h-4 w-4" /> Start</button>
+              <button onClick={() => lifecycle.mutate('start')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="play" className="h-4 w-4" /> Iniciar</button>
             ) : isApp ? (
               <span className="text-xs text-muted px-2">← faça Deploy para iniciar</span>
             ) : null}
             {(s.status === 'running' || s.status === 'online') && (
-              <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="pause" className="h-4 w-4" /> Stop</button>
+              <button onClick={() => lifecycle.mutate('stop')} disabled={lifecycle.isPending} className="btn-ghost text-sm"><Icon name="pause" className="h-4 w-4" /> Parar</button>
             )}
             <button
               onClick={() => setShowDeleteModal(true)}
