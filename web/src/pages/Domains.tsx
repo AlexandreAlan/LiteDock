@@ -6,15 +6,38 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/icons';
 import { Spinner, Empty, ErrorNote } from '../components/ui';
 
-function certColor(d: DomainFull) {
-  if (!d.https) return 'text-muted';
+// Mesmo default do backend (src/services/naming.ts#servicesBaseDomain) — usado
+// quando o ajuste "Domínio dos serviços" não foi customizado.
+const DEFAULT_SERVICE_BASE_DOMAIN = 'litedock.morenadoaco.com.br';
+
+// `Domain.https` no banco indica se o TRAEFIK termina TLS para aquele host
+// específico (cert Let's Encrypt individual) — é `false` de propósito pros
+// subdomínios auto-gerados sob o domínio curinga (*.{base}), porque ali quem
+// termina TLS é o nginx com o certificado wildcard, antes de chegar no Traefik
+// (o Traefik conversa em HTTP puro com o nginx nesse caso). Ou seja: `https:
+// false` no banco NÃO significa "sem HTTPS" pra esses hosts — significa
+// "sem certificado individual próprio". Só domínio de cliente fora do domínio
+// curinga (custom domain) depende mesmo do certificado individual do Traefik.
+function isUnderServiceWildcard(host: string, base: string): boolean {
+  const h = host.toLowerCase().replace(/\.$/, '');
+  const b = base.toLowerCase().replace(/^\*\./, '').replace(/\.$/, '');
+  return h === b || h.endsWith(`.${b}`);
+}
+
+function effectiveHttps(d: DomainFull, base: string): boolean {
+  return d.https || isUnderServiceWildcard(d.host, base);
+}
+
+function certColor(d: DomainFull, base: string) {
+  if (!effectiveHttps(d, base)) return 'text-muted';
   if (d.certStatus === 'active') return 'text-ok';
   if (d.certStatus === 'error') return 'text-bad';
   return 'text-warn';
 }
 
-function certLabel(d: DomainFull) {
-  if (!d.https) return 'HTTP';
+function certLabel(d: DomainFull, base: string) {
+  if (!effectiveHttps(d, base)) return 'HTTP';
+  if (!d.https) return 'HTTPS'; // wildcard do LiteDock — HTTPS de fábrica via nginx, sem cert individual no Traefik
   if (d.certStatus === 'active') return 'SSL ativo';
   if (d.certStatus === 'error') return 'SSL erro';
   return d.certStatus ?? 'pendente';
@@ -26,6 +49,12 @@ export function Domains() {
     queryFn: () => api.get<DomainFull[]>('/domains'),
     refetchInterval: 30000,
   });
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<Record<string, string>>('/settings'),
+    staleTime: 60_000,
+  });
+  const serviceBase = settings?.serviceCustomDomain?.trim() || DEFAULT_SERVICE_BASE_DOMAIN;
   const [search, setSearch] = useState('');
   const domains = data ?? [];
 
@@ -40,7 +69,7 @@ export function Domains() {
     );
   }, [domains, search]);
 
-  const httpsDomains = domains.filter((d) => d.https).length;
+  const httpsDomains = domains.filter((d) => effectiveHttps(d, serviceBase)).length;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -79,13 +108,13 @@ export function Domains() {
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <a
-                    href={`${d.https ? 'https' : 'http'}://${d.host}`}
+                    href={`${effectiveHttps(d, serviceBase) ? 'https' : 'http'}://${d.host}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-1.5 font-medium text-ink hover:text-brand"
                   >
                     <Icon name="globe" className="h-4 w-4 shrink-0 text-muted" />
-                    {d.https ? 'https://' : 'http://'}{d.host}
+                    {effectiveHttps(d, serviceBase) ? 'https://' : 'http://'}{d.host}
                     <Icon name="externalLink" className="h-3 w-3 text-muted" />
                   </a>
                   <div className="mt-0.5 flex items-center gap-2 pl-5 text-xs text-muted">
@@ -97,9 +126,9 @@ export function Domains() {
                     <span>porta {d.targetPort}</span>
                   </div>
                 </div>
-                <span className={`flex items-center gap-1.5 text-xs font-medium ${certColor(d)}`}>
+                <span className={`flex items-center gap-1.5 text-xs font-medium ${certColor(d, serviceBase)}`}>
                   <Icon name="shield" className="h-3.5 w-3.5" />
-                  {certLabel(d)}
+                  {certLabel(d, serviceBase)}
                 </span>
               </li>
             ))}
