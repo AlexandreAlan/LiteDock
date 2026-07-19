@@ -104,6 +104,38 @@ export async function ensureNetwork() {
   }
 }
 
+// Remove a rede isolada do projeto (best-effort, idempotente). Chamada ao
+// apagar o projeto, DEPOIS que todos os containers dos serviços já foram
+// removidos (removeContainer). Mesmo assim o Traefik costuma seguir plugado
+// nela (network_ensure/ensureProjectNetwork o conecta a toda rede de projeto
+// pra rotear ingress) — o Docker recusa DELETE de rede com container
+// conectado, então desconectamos primeiro qualquer sobra (Traefik ou
+// container órfão) antes do remove. Nunca lança: se a rede já não existe (ou
+// a remoção falha por algum motivo), só loga — não deve travar a exclusão do
+// projeto no banco.
+export async function removeProjectNetwork(slug: string): Promise<void> {
+  const name = projectNetwork(slug);
+  const network = docker.getNetwork(name);
+  let info: { Containers?: Record<string, unknown> };
+  try {
+    info = await network.inspect();
+  } catch {
+    return; // rede já não existe — nada a fazer (idempotente)
+  }
+  for (const containerId of Object.keys(info.Containers ?? {})) {
+    try {
+      await network.disconnect({ Container: containerId, Force: true });
+    } catch (e) {
+      console.error(`[removeProjectNetwork] falha ao desconectar ${containerId} da rede ${name}:`, (e as Error).message);
+    }
+  }
+  try {
+    await network.remove();
+  } catch (e) {
+    console.error(`[removeProjectNetwork] falha ao remover a rede ${name}:`, (e as Error).message);
+  }
+}
+
 export function containerName(projectSlug: string, serviceName: string) {
   return `litedock-${projectSlug}-${serviceName}`;
 }
