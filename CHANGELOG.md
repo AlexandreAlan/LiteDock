@@ -3,7 +3,7 @@
 Todas as mudanças notáveis do LiteDock são documentadas aqui.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
-## [Não lançado]
+## [v0.10.0] — 2026-07-19
 
 Auditoria de segurança completa do control-plane + leva grande de funcionalidades novas.
 
