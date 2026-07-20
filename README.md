@@ -22,6 +22,22 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 
 ---
 
+## Por que LiteDock
+
+|  | **LiteDock** | Coolify | Dokploy | EasyPanel |
+|---|---|---|---|---|
+| Licença | PolyForm Shield — grátis pra usar e modificar, só restringe revenda como concorrente | Apache 2.0 | Apache 2.0 | Proprietário / pago |
+| Interface nativa em PT-BR | ✅ | — | — | — |
+| IDE completo no browser (VS Code) + terminal real por serviço | ✅ | — | — | — |
+| Deploy por Git (Nixpacks) ou imagem Docker | ✅ | ✅ | ✅ | ✅ |
+| HTTPS automático (Traefik + Let's Encrypt) | ✅ | ✅ | ✅ | ✅ |
+| Self-hosted, roda na sua própria VPS | ✅ | ✅ | ✅ | ✅ |
+| Custo | Grátis | Grátis (self-host) | Grátis | Pago |
+
+Feito no Brasil, pra quem quer sair do terminal sem depender de ferramenta em inglês ou de plano pago.
+
+---
+
 ## Capturas de tela
 
 ### Dashboard — projetos e métricas da VPS em tempo real
@@ -30,11 +46,11 @@ build, deploy blue-green, HTTPS automático, variáveis criptografadas e monitor
 ### Monitor — todos os containers com CPU, memória e rede ao vivo
 ![Monitor](docs/screenshots/02-monitor.png)
 
-### Serviço — botão Abrir, Deploy blue-green, URL gerada automaticamente
+### Serviço — deploy por Git ou imagem Docker, build via Nixpacks ou Dockerfile
 ![Serviço](docs/screenshots/03-service.png)
 
-### Métricas — gráficos de histórico por container
-![Métricas](docs/screenshots/04-metrics.png)
+### Domínios — subdomínio automático por serviço, HTTPS via Let's Encrypt
+![Domínios](docs/screenshots/04-metrics.png)
 
 ---
 
