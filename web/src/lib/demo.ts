@@ -187,6 +187,56 @@ const SYSTEM_CONTAINERS = ['litedock-traefik', 'litedock-postgres', 'watchtower'
 const runningState = new Map<string, boolean>();
 const schedules = new Map<string, { startTime: string | null; stopTime: string | null; enabled: boolean }>();
 
+// ── PM2 (demo) ───────────────────────────────────────────────────────────────
+interface DemoPm2Proc {
+  id: number; name: string; pid: number | null; status: string;
+  cpu: number; memory: number; uptime: number | null; restarts: number;
+  cwd: string; script: string; outLog: string; errLog: string;
+}
+const demoPm2: DemoPm2Proc[] = [
+  { id: 0, name: 'api-principal', pid: 41822, status: 'online', cpu: 1.2, memory: 96_000_000, uptime: Date.now() - 5 * 86400_000, restarts: 2, cwd: '/var/www/api-principal', script: 'dist/server.js', outLog: '/root/.pm2/logs/api-principal-out.log', errLog: '/root/.pm2/logs/api-principal-error.log' },
+  { id: 1, name: 'worker-emails', pid: 41830, status: 'online', cpu: 0.3, memory: 58_000_000, uptime: Date.now() - 7 * 86400_000, restarts: 0, cwd: '/var/www/worker-emails', script: 'index.js', outLog: '/root/.pm2/logs/worker-emails-out.log', errLog: '/root/.pm2/logs/worker-emails-error.log' },
+  { id: 2, name: 'bot-whatsapp', pid: null, status: 'stopped', cpu: 0, memory: 0, uptime: null, restarts: 5, cwd: '/var/www/bot-whatsapp', script: 'bot.js', outLog: '/root/.pm2/logs/bot-whatsapp-out.log', errLog: '/root/.pm2/logs/bot-whatsapp-error.log' },
+];
+
+// ── Ferramentas (demo) ───────────────────────────────────────────────────────
+const demoPorts = [
+  { port: 22, proto: 'tcp', pid: 812, process: 'sshd', state: 'LISTEN', addr: '0.0.0.0' },
+  { port: 80, proto: 'tcp', pid: 1204, process: 'nginx', state: 'LISTEN', addr: '0.0.0.0' },
+  { port: 443, proto: 'tcp', pid: 1204, process: 'nginx', state: 'LISTEN', addr: '0.0.0.0' },
+  { port: 3000, proto: 'tcp', pid: 41822, process: 'node', state: 'LISTEN', addr: '127.0.0.1' },
+  { port: 5432, proto: 'tcp', pid: 2201, process: 'postgres', state: 'LISTEN', addr: '127.0.0.1' },
+  { port: 6379, proto: 'tcp', pid: 2340, process: 'redis-server', state: 'LISTEN', addr: '127.0.0.1' },
+];
+const demoDisk = [
+  { path: '/var/www', size: '18.4 GB', bytes: 18_400_000_000 },
+  { path: '/var/lib/docker', size: '9.1 GB', bytes: 9_100_000_000 },
+  { path: '/var/log', size: '1.2 GB', bytes: 1_200_000_000 },
+  { path: '/root/.pm2', size: '340 MB', bytes: 340_000_000 },
+];
+const demoCrons = [
+  { raw: '0 3 * * * /usr/local/bin/backup.sh', schedule: '0 3 * * *', command: '/usr/local/bin/backup.sh', user: 'root' },
+  { raw: '*/15 * * * * curl -fsS https://minhaloja.com.br/health', schedule: '*/15 * * * *', command: 'curl -fsS https://minhaloja.com.br/health', user: 'alexandre' },
+  { raw: '0 0 * * 0 docker system prune -f', schedule: '0 0 * * 0', command: 'docker system prune -f', user: 'root' },
+];
+let demoEnvEntries = [
+  { key: 'NODE_ENV', value: 'production', comment: false },
+  { key: 'PORT', value: '3000', comment: false },
+  { key: 'DATABASE_URL', value: 'postgres://demo:••••@localhost:5432/demo', comment: false, masked: true },
+  { key: '# gerado pelo LiteDock', value: '', comment: true },
+];
+
+// ── DevSpace / Forge (demo) ──────────────────────────────────────────────────
+interface DemoDevProject {
+  slug: string; name: string; path: string;
+  stacks: string[]; devCmd: string | null; port: number | null;
+  git: { branch: string; commit: string | null; dirty: boolean; ahead: number } | null;
+}
+const demoDevProjects: DemoDevProject[] = [
+  { slug: 'loja-online', name: 'loja-online', path: '/var/www/loja-online', stacks: ['Next.js'], devCmd: 'npm run dev', port: 3000, git: { branch: 'main', commit: '3f9a1c2', dirty: false, ahead: 0 } },
+  { slug: 'api-privada', name: 'api-privada', path: '/var/www/api-privada', stacks: ['Node.js'], devCmd: 'npm run dev', port: 4000, git: { branch: 'main', commit: '7b21e0a', dirty: true, ahead: 2 } },
+];
+
 // ── Catálogo de templates ───────────────────────────────────────────────────
 const TEMPLATES: TemplateCatalog = {
   categories: ['CMS', 'Banco de Dados', 'Automação', 'Analytics', 'Ferramentas'],
@@ -472,7 +522,7 @@ function route(method: string, path: string, body: any): unknown {
   ];
 
   // servers / monitor
-  if (rawPath === '/servers/local/version') return { version: '0.6.0' };
+  if (rawPath === '/servers/local/version') return { version: '0.10.0' };
   if (rawPath === '/servers/local/metrics') return hostMetrics();
   if (rawPath === '/servers/local/engine') return engineInfo();
   if (rawPath === '/servers/local/container-stats') return containerStats();
@@ -555,6 +605,71 @@ function route(method: string, path: string, body: any): unknown {
     if (parts[2] === 'logs' && M === 'GET') return { logs: demoLogs(s) };
     if (parts[2] === 'webhook' && M === 'POST') return { url: `https://demo.litedock.app/webhooks/services/${s.id}/deploy?token=${uid()}${uid()}` };
   }
+
+  // pm2
+  if (rawPath === '/pm2/processes' && M === 'GET') return { processes: demoPm2 };
+  if (rawPath === '/pm2/processes' && M === 'POST') {
+    const p: DemoPm2Proc = { id: demoPm2.length, name: body?.name || `processo-${demoPm2.length}`, pid: 40000 + demoPm2.length, status: 'online', cpu: 0.1, memory: 30_000_000, uptime: Date.now(), restarts: 0, cwd: body?.cwd || '/var/www', script: body?.script || 'index.js', outLog: '', errLog: '' };
+    demoPm2.push(p);
+    return { ok: true, process: p };
+  }
+  if (parts[0] === 'pm2' && parts[1] && parts[2] === 'logs' && M === 'GET') {
+    const p = demoPm2.find((x) => x.name === decodeURIComponent(parts[1]));
+    return { out: p ? `${nowISO()} [${p.name}] pronto em 214ms\n${nowISO()} [${p.name}] GET / 200 — 8ms` : '', err: '' };
+  }
+  if (parts[0] === 'pm2' && parts[1] && parts[2] && M === 'POST') {
+    const p = demoPm2.find((x) => x.name === decodeURIComponent(parts[1]));
+    const act = parts[2];
+    if (p) {
+      if (act === 'start' || act === 'restart') { p.status = 'online'; p.pid = 40000 + p.id; p.uptime = Date.now(); p.restarts += act === 'restart' ? 1 : 0; }
+      if (act === 'stop') { p.status = 'stopped'; p.pid = null; p.uptime = null; }
+      if (act === 'delete') { const i = demoPm2.indexOf(p); if (i >= 0) demoPm2.splice(i, 1); }
+    }
+    return { ok: true };
+  }
+
+  // ferramentas
+  if (rawPath === '/tools/ports' && M === 'GET') return { ports: demoPorts };
+  if (rawPath === '/tools/disk' && M === 'GET') return { entries: demoDisk };
+  if (rawPath === '/tools/crons' && M === 'GET') return { crons: demoCrons };
+  if (rawPath === '/tools/env' && M === 'GET') return { entries: demoEnvEntries };
+  if (rawPath === '/tools/env' && M === 'PUT') { demoEnvEntries = body?.entries ?? demoEnvEntries; return { ok: true }; }
+  if (rawPath === '/tools/health' && M === 'GET') return {
+    checks: demoPorts.filter((p) => [80, 443, 3000].includes(p.port)).map((p) => ({ port: p.port, process: p.process, pid: p.pid, httpStatus: 200, ms: Math.round(8 + Math.random() * 40), ok: true })),
+  };
+  if (rawPath === '/tools/overview' && M === 'GET') {
+    return {
+      pm2: demoPm2.map((p) => ({ kind: 'pm2', name: p.name, status: p.status, cpu: p.cpu, memory: p.memory, uptime: p.uptime, restarts: p.restarts, cwd: p.cwd, ports: [] })),
+      docker: store.services.filter((s) => s.containerId).map((s) => ({ kind: 'docker', name: `litedock-${s.name}`, image: s.spec.image || s.spec.repo || 'nixpacks-build', status: s.status === 'running' ? 'running' : 'exited', managed: true, ports: s.spec.port ? [s.spec.port] : [] })),
+    };
+  }
+  if (rawPath === '/tools/import-all' && M === 'POST') return { imported: demoPm2.length, skipped: 1, errors: [] };
+
+  // atividade
+  if (rawPath.startsWith('/activity/stats')) {
+    const all = store.services.flatMap((s) => s.deployments);
+    return { total: all.length, successes: all.filter((d) => d.status === 'success').length, failures: all.filter((d) => d.status === 'failed').length, today: 1 };
+  }
+  if (rawPath.startsWith('/activity') && M === 'GET') {
+    const all = store.services.flatMap((s) => s.deployments.map((d) => ({
+      id: d.id, status: d.status, trigger: d.trigger, commitSha: d.imageTag ?? null, imageTag: d.imageTag ?? null,
+      startedAt: d.startedAt, finishedAt: d.finishedAt ?? null,
+      service: { id: s.id, name: s.name, project: { id: s.projectId, name: store.projects.find((p) => p.id === s.projectId)?.name || '' } },
+    })));
+    all.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    return { deployments: all.slice(0, 100), total: all.length };
+  }
+
+  // devspace / studio (Forge) — sessão e listagem funcionam; o IDE embutido em si
+  // exige um code-server real, então não é simulável num build 100% estático.
+  if (rawPath === '/studio/session' && M === 'POST') return { ok: true };
+  if (rawPath === '/devspace/projects' && M === 'GET') return { projects: demoDevProjects };
+  if (rawPath === '/devspace/projects' && M === 'POST') {
+    const p: DemoDevProject = { slug: uid(), name: body?.name || 'novo-projeto', path: `/var/www/${body?.name || 'novo-projeto'}`, stacks: [body?.template || 'Node.js'], devCmd: 'npm run dev', port: body?.port || 3000, git: null };
+    demoDevProjects.push(p);
+    return p;
+  }
+  if (rawPath === '/devspace/publish' && M === 'POST') return { ok: true, serviceId: store.services[0]?.id };
 
   throw new DemoError(404, `Demo: rota não mapeada — ${M} ${rawPath}`);
 }
